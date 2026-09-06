@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Family OS — לוח בקרה משפחתי</title>
+<style>
+:root {
+  --bg-primary: #F7F5F2;
+  --bg-card: #FFFFFF;
+  --bg-header: #2E3A46;
+  --text-primary: #23282D;
+  --text-secondary: #6B7280;
+  --text-on-dark: #FFFFFF;
+  --accent-fin: #4C72B0;
+  --accent-kids: #DD8452;
+  --accent-shop: #55A868;
+  --accent-home: #C44E52;
+  --accent-proj: #8172B3;
+  --accent-cal: #937860;
+  --positive: #2F9E58;
+  --warn: #D98E04;
+  --danger: #D64545;
+  --neutral: #9AA0A6;
+  --accent-parent: #4C72B0;
+  --accent-child: #DD8452;
+  --gap: 16px;
+  --radius: 14px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+.wrap { max-width: 1100px; margin: 0 auto; padding: var(--gap); }
+header {
+  background: var(--bg-header);
+  color: var(--text-on-dark);
+  padding: 22px 24px;
+  border-radius: var(--radius);
+  margin-bottom: var(--gap);
+}
+header h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+header p { font-size: 13px; opacity: .75; }
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: var(--gap);
+}
+.kpi {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.kpi .num { font-size: 26px; font-weight: 700; }
+.kpi .lbl { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+.tabs { display:flex; gap:8px; margin-bottom: var(--gap); flex-wrap: wrap; }
+.tab {
+  padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  background: var(--bg-card); color: var(--text-secondary); cursor: pointer;
+  border: 1px solid transparent;
+}
+.tab.active { background: var(--bg-header); color: #fff; }
+
+.filters { display:flex; gap:8px; margin-bottom: var(--gap); flex-wrap: wrap; }
+.filters select {
+  padding: 7px 12px; border-radius: 8px; border: 1px solid #ddd;
+  background: var(--bg-card); font-size: 13px; color: var(--text-primary);
+}
+
+.section { display:none; }
+.section.active { display:block; }
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--gap);
+}
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  border-inline-start: 5px solid var(--neutral);
+}
+.card .top-row { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.card h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.badge {
+  display:inline-block; font-size: 11px; padding: 3px 9px; border-radius: 999px;
+  color: #fff; white-space: nowrap;
+}
+.meta { font-size: 12px; color: var(--text-secondary); margin-top: 8px; display:flex; flex-wrap:wrap; gap: 10px; }
+.meta span { display:flex; align-items:center; gap:4px; }
+.priority-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+
+.status-pill { font-weight:600; }
+.status-todo { background: var(--neutral); }
+.status-progress { background: var(--warn); }
+.status-waiting { background: #B08D57; }
+.status-done { background: var(--positive); }
+
+.progress-row { display:flex; align-items:center; gap:8px; margin-top:10px; }
+.progress-track { flex:1; height:7px; border-radius:999px; background:#EEECE7; overflow:hidden; }
+.progress-fill { height:100%; background: var(--positive); }
+.progress-label { font-size:11.5px; color: var(--text-secondary); white-space:nowrap; font-variant-numeric: tabular-nums; }
+
+.table-wrap { overflow-x: auto; border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+table { width: 100%; border-collapse: collapse; background: var(--bg-card); overflow:hidden; }
+th, td { padding: 10px 12px; text-align: right; font-size: 13px; border-bottom: 1px solid #f0eee9; white-space: nowrap; }
+th { background: #FAFAF8; color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing:.4px; }
+tr:last-child td { border-bottom:none; }
+tr.task-row { cursor:pointer; }
+tr.task-row:hover { background:#FAF9F6; }
+.chevron { color: var(--text-secondary); font-size:15px; }
+
+.type-icon { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:6px; font-size:11px; margin-inline-end:6px; }
+.type-once { background: rgba(76,114,176,.15); }
+.type-process { background: rgba(129,114,179,.15); }
+
+.progress-cell { display:flex; align-items:center; gap:8px; }
+.progress-track-sm { width:60px; height:6px; border-radius:999px; background:#EEECE7; overflow:hidden; flex-shrink:0; }
+.progress-fill-sm { height:100%; background: var(--positive); }
+.progress-text { color: var(--text-secondary); font-size:12px; white-space:nowrap; }
+.related-badge {
+  display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600;
+  padding:2px 8px; border-radius:999px; background: rgba(221,132,82,.15); color:#9A5426;
+}
+
+.log-list { margin-top:10px; display:flex; flex-direction:column; gap:6px; }
+.log-entry {
+  font-size: 12.5px; color: var(--text-primary); background: #F5F4F1;
+  border-radius: 8px; padding: 8px 10px;
+}
+.log-entry .log-meta { display:block; font-size:11px; color:var(--text-secondary); margin-top:3px; }
+.log-empty { font-size: 12.5px; color: var(--text-secondary); font-style: italic; background:#F5F4F1; border-radius:8px; padding:8px 10px; margin-top:10px; }
+
+.people-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--gap); }
+.person-card {
+  background: var(--bg-card); border-radius: var(--radius); padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06); border-inline-start: 5px solid var(--neutral);
+  display:flex; align-items:center; gap:12px;
+}
+.person-avatar {
+  width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:18px; color:#fff; flex-shrink:0;
+}
+.person-name { font-weight:700; font-size:14px; }
+.person-role { font-size:12px; color: var(--text-secondary); margin-top:2px; }
+
+.routines-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--gap); }
+.routine-card {
+  background: var(--bg-card); border-radius: var(--radius); padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06); border-inline-start: 5px solid var(--neutral);
+}
+.routine-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.routine-toggle {
+  border:none; border-radius:999px; padding:6px 14px; font-size:12px; font-weight:700;
+  cursor:pointer; white-space:nowrap; font-family:inherit;
+}
+.routine-toggle.done { background: rgba(47,158,88,.15); color: var(--positive); }
+.routine-toggle.pending { background: rgba(154,160,166,.18); color: var(--text-secondary); }
+.routine-history { display:flex; align-items:center; gap:6px; margin-top:14px; }
+.routine-history .hist-lbl { font-size:11px; color: var(--text-secondary); margin-inline-end:2px; }
+.hist-dot { width:10px; height:10px; border-radius:50%; background:#E7E3DB; }
+.hist-dot.done { background: var(--positive); }
+.hist-dot.missed { background: var(--danger); opacity:.55; }
+
+.footer-note { font-size: 12px; color: var(--text-secondary); text-align:center; margin-top: 20px; }
+.add-row { text-align:center; padding: 24px; color: var(--text-secondary); font-size: 13px; border: 1.5px dashed #ddd; border-radius: var(--radius); cursor:pointer; }
+.add-row:hover { background:#FAF9F6; }
+
+.toolbar-row { display:flex; justify-content:flex-end; margin-bottom:10px; }
+.btn-primary {
+  background: var(--bg-header); color:#fff; border:none; border-radius:8px;
+  padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;
+}
+.btn-primary:hover { opacity:.92; }
+.btn-secondary {
+  background:#EEECE7; color:var(--text-primary); border:none; border-radius:8px;
+  padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;
+}
+.btn-danger-text {
+  background:none; border:none; color:var(--danger); font-size:13px; font-weight:600;
+  cursor:pointer; font-family:inherit; padding:9px 4px;
+}
+.icon-edit-btn {
+  background:none; border:1px solid #E5E2DB; border-radius:8px; cursor:pointer;
+  font-size:13px; padding:5px 9px; color:var(--text-secondary); font-family:inherit; flex-shrink:0;
+}
+.icon-edit-btn:hover { background:#FAF9F6; }
+
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(35,40,45,.5);
+  display:flex; align-items:flex-start; justify-content:center;
+  padding: 48px 16px; z-index:50; overflow-y:auto;
+}
+.modal-overlay[hidden] { display:none; }
+.modal {
+  background: var(--bg-card); border-radius: var(--radius); max-width:580px; width:100%;
+  box-shadow: 0 16px 48px rgba(0,0,0,.2);
+}
+.modal-header {
+  padding: 20px 22px; border-bottom:1px solid #f0eee9;
+  display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
+}
+.modal-header h2 { font-size:17px; font-weight:700; }
+.modal-close {
+  background:none; border:none; font-size:20px; color:var(--text-secondary);
+  cursor:pointer; line-height:1; padding:4px; flex-shrink:0;
+}
+.modal-close:focus-visible, .routine-toggle:focus-visible, .tab:focus-visible { outline:2px solid var(--accent-fin); outline-offset:2px; }
+.modal-body { padding: 20px 22px; display:flex; flex-direction:column; gap:20px; }
+.modal-meta-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap:14px; }
+.meta-item .k { font-size:10.5px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.3px; margin-bottom:3px; }
+.meta-item .v { font-size:13.5px; font-weight:600; }
+.modal-section h4 { font-size:12px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.3px; margin-bottom:9px; }
+.subtask-list { display:flex; flex-direction:column; gap:8px; }
+.subtask-item { display:flex; align-items:flex-start; gap:10px; background:#FAF9F6; border-radius:8px; padding:9px 11px; }
+.subtask-item input[type=checkbox] { margin-top:3px; width:16px; height:16px; accent-color:var(--positive); cursor:pointer; flex-shrink:0; }
+.subtask-item .stx-name { font-size:13.5px; }
+.subtask-item.done .stx-name { text-decoration:line-through; color:var(--text-secondary); }
+.subtask-item .stx-note { font-size:12px; color:var(--text-secondary); margin-top:3px; font-style:italic; }
+.project-link-card { background:#FAF9F6; border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+.project-link-card .plc-name { font-weight:700; font-size:13.5px; }
+
+.form-field { display:flex; flex-direction:column; gap:5px; margin-bottom:14px; }
+.form-field label { font-size:11.5px; font-weight:600; color:var(--text-secondary); }
+.form-field input, .form-field select, .form-field textarea {
+  padding:8px 10px; border:1px solid #E5E2DB; border-radius:8px; font-size:13.5px;
+  font-family:inherit; color:var(--text-primary); background:#fff; width:100%;
+}
+.form-field textarea { resize:vertical; min-height:54px; }
+.form-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap:0 14px; }
+.type-toggle { display:flex; gap:10px; margin-bottom:16px; }
+.type-option {
+  flex:1; border:1.5px solid #E5E2DB; border-radius:10px; padding:10px 12px;
+  cursor:pointer; text-align:center; font-size:13px;
+}
+.type-option input { display:none; }
+.type-option.selected { border-color: var(--accent-proj); background: rgba(129,114,179,.08); font-weight:700; }
+.subtask-builder { display:flex; flex-direction:column; gap:8px; }
+.subtask-row { display:flex; gap:8px; align-items:flex-start; }
+.subtask-row input[type=text] { flex:1; }
+.remove-subtask-row {
+  background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px;
+  padding:6px 8px; flex-shrink:0;
+}
+.form-actions {
+  display:flex; justify-content:space-between; align-items:center;
+  padding-top:16px; margin-top:4px; border-top:1px solid #f0eee9;
+}
+.form-actions-right { display:flex; gap:8px; }
+.toast {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+  background:var(--bg-header); color:#fff; padding:10px 20px; border-radius:999px;
+  font-size:13px; font-weight:600; box-shadow:0 6px 20px rgba(0,0,0,.2); z-index:60;
+}
+.toast[hidden] { display:none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .modal { animation: modal-in .16s ease-out; }
+}
+@keyframes modal-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+@media (max-width: 640px) {
+  .kpi-row { grid-template-columns: repeat(2,1fr); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🏠 Family OS — סקיצה חזותית</h1>
+    <p>איך זה יכול להיראות כממשק אינטרנטי, בהתבסס על מבנה הנתונים המעודכן: שגרות יומיות, סוגי משימות, ותצוגת פירוט למשימה בודדת. עכשיו אפשר גם להוסיף ולערוך משימות, שגרות ופרויקטים ישירות כאן — כולל בחירת סוג המשימה (חד-פעמית/תהליכית) ותתי-משימות.</p>
+    <p style="margin-top:6px">⚠️ שינויים שנעשים כאן מתעדכנים מיידית בתצוגה, אבל עדיין לא נשמרים אוטומטית בקובץ ה-Excel — זה יגיע בשלב האפליקציה האמיתית. עד אז, כל מה שמוסיפים או עורכים כאן אפשר להעביר אליי כדי לעדכן את הטבלה בסבב הבא.</p>
+  </header>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="projects">🧩 פרויקטים</div>
+    <div class="tab" data-tab="tasks">✅ משימות</div>
+    <div class="tab" data-tab="routines">🔁 שגרות יומיות</div>
+    <div class="tab" data-tab="shopping">🛒 קניות</div>
+    <div class="tab" data-tab="people">👪 בני המשפחה</div>
+  </div>
+
+  <div class="filters" id="filters"></div>
+
+  <div class="section active" id="sec-projects"><div class="cards" id="projectsCards"></div></div>
+  <div class="section" id="sec-tasks">
+    <div class="toolbar-row"><button class="btn-primary" id="addTaskBtn">+ משימה חדשה</button></div>
+    <div class="table-wrap"><table id="tasksTable"></table></div>
+  </div>
+  <div class="section" id="sec-routines">
+    <div class="toolbar-row"><button class="btn-primary" id="addRoutineBtn">+ שגרה חדשה</button></div>
+    <div class="routines-grid" id="routinesGrid"></div>
+  </div>
+  <div class="section" id="sec-shopping">
+    <div class="table-wrap"><table id="shopTable"></table></div>
+  </div>
+  <div class="section" id="sec-people"><div class="people-grid" id="peopleGrid"></div></div>
+
+  <p class="footer-note">Family_OS Database · דוגמת עיצוב שנוצרה מתוך מבנה הנתונים המעודכן</p>
+</div>
+
+<div class="modal-overlay" id="taskModalOverlay" hidden>
+  <div class="modal" id="taskModal" role="dialog" aria-modal="true"></div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const CATEGORY_COLOR = {
+  "פיננסים וניהול עתידי": "var(--accent-fin)",
+  "ילדים": "var(--accent-kids)",
+  "קניות וציוד": "var(--accent-shop)",
+  "תחזוקת הבית": "var(--accent-home)",
+  "פרויקטים וחלומות": "var(--accent-proj)",
+  "לוח שנה ואירועים": "var(--accent-cal)"
+};
+
+const TODAY_STR = "2026-08-29";
+const HISTORY_DATES = ["2026-08-27", "2026-08-28", "2026-08-29"];
+const DATE_LABEL = {"2026-08-27":"27/8", "2026-08-28":"28/8", "2026-08-29":"29/8 (היום)"};
+
+const PEOPLE = [
+  {name:"לירן", role:"הורה", assignable:true},
+  {name:"מורן", role:"הורה", assignable:true},
+  {name:"דור", role:"ילד/ה", assignable:false},
+  {name:"שי", role:"ילד/ה", assignable:false}
+];
+
+const PROJECTS = [
+  {id:"PRJ-001", name:"חדר משחקים לילדים", category:"פרויקטים וחלומות", owner:"לירן", status:"todo", priority:"רגיל", target:null, budget:null, notes:null}
+];
+
+const TASKS = [
+  {id:"TSK-001", name:"תיקון נזילה במקלחת חדר הורים", category:"תחזוקת הבית", owner:"לירן", status:"todo",
+   taskType:"תהליכית", dueDate:"2026-08-07", dueTime:null, frequency:"חד-פעמי", priority:"רגיל",
+   next:"להתקשר לאיש מקצוע לקבלת הצעת מחיר", relatedPerson:null, projectId:null,
+   subtasks:[
+     {id:"SUB-001", name:"לתאם ביקור של איש מקצוע", done:false, notes:"המקצוען הראשון שפנינו אליו לא ענה, ננסה שני"},
+     {id:"SUB-002", name:"לקבל הצעת מחיר", done:false},
+     {id:"SUB-003", name:"לאשר תאריך לתיקון בפועל", done:false}
+   ]},
+  {id:"TSK-002", name:"תכנון רשימת קניות שבועית לבית", category:"קניות וציוד", owner:"מורן", status:"progress",
+   taskType:"חד-פעמית", dueDate:"2026-08-06", dueTime:null, frequency:"שבועי", priority:"רגיל",
+   next:"בדיקת חוסרים במזווה ובמקרר", relatedPerson:null, projectId:null, subtasks:[]},
+  {id:"TSK-003", name:"תקציב חודשי והגדרת יעד פנוי", category:"פיננסים וניהול עתידי", owner:"לירן", status:"progress",
+   taskType:"חד-פעמית", dueDate:"2026-08-10", dueTime:null, frequency:"חודשי", priority:"רגיל",
+   next:"הוצאת סיכום נתונים מתקציב", relatedPerson:null, projectId:null, subtasks:[]},
+  {id:"TSK-004", name:"שיחת סנכרון משפחתית שבועית", category:"לוח שנה ואירועים", owner:"לירן", status:"todo",
+   taskType:"חד-פעמית", dueDate:"2026-08-09", dueTime:"20:00", frequency:"שבועי", priority:"רגיל",
+   next:"פתיחת הקובץ ובדיקת משימות פתוחות", relatedPerson:null, projectId:null, subtasks:[]},
+  {id:"TSK-005", name:"קלינאית תקשורת - דור", category:"ילדים", owner:"מורן", status:"todo",
+   taskType:"חד-פעמית", dueDate:null, dueTime:"16:30", frequency:"חד-פעמי", priority:"רגיל",
+   next:"—", relatedPerson:"דור", projectId:null, subtasks:[]},
+  {id:"TSK-006", name:"קלינאית תקשורת - שי", category:"ילדים", owner:"מורן", status:"todo",
+   taskType:"חד-פעמית", dueDate:null, dueTime:"17:15", frequency:"חד-פעמי", priority:"רגיל",
+   next:"—", relatedPerson:"שי", projectId:null, subtasks:[]},
+  {id:"TSK-007", name:"לבחור פלטת צבעים לחדר", category:"פרויקטים וחלומות", owner:"מורן", status:"done",
+   taskType:"חד-פעמית", dueDate:null, dueTime:null, frequency:"חד-פעמי", priority:"רגיל",
+   next:"—", relatedPerson:null, projectId:"PRJ-001", subtasks:[]},
+  {id:"TSK-008", name:"לקנות שטיח לחדר המשחקים", category:"פרויקטים וחלומות", owner:"לירן", status:"todo",
+   taskType:"חד-פעמית", dueDate:null, dueTime:null, frequency:"חד-פעמי", priority:"רגיל",
+   next:"לבדוק מידות החדר לפני הזמנה", relatedPerson:null, projectId:"PRJ-001", subtasks:[]}
+];
+
+const ROUTINES = [
+  {id:"ROU-001", name:"סידור וניקיון מטבח בערב", category:"תחזוקת הבית", assignee:"מורן", active:true, notes:null},
+  {id:"ROU-002", name:"בדיקת תיקים וציוד לגן/בית ספר", category:"ילדים", assignee:"לירן", active:true, notes:null},
+  {id:"ROU-003", name:"השקיית צמחים", category:"תחזוקת הבית", assignee:"לירן", active:true, notes:"רק בקיץ"}
+];
+
+// Mutable in-memory log — clicking "בוצע היום" edits this, mirroring RoutineCompletions
+const ROUTINE_COMPLETIONS = [
+  {routineId:"ROU-001", date:"2026-08-27", done:true, by:"מורן"},
+  {routineId:"ROU-001", date:"2026-08-28", done:true, by:"לירן"},
+  {routineId:"ROU-001", date:"2026-08-29", done:false, by:null},
+  {routineId:"ROU-002", date:"2026-08-28", done:true, by:"לירן"},
+  {routineId:"ROU-002", date:"2026-08-29", done:true, by:"לירן"}
+];
+
+const SHOPPING = [
+  {name:"חלב", category:"אוכל", status:"לרכישה", store:"סופר"},
+  {name:"נייר טואלט", category:"טואלטיקה", status:"לרכישה", store:"פארם"}
+];
+
+// Unified log — mirrors the Updates_Log table (project + task entries together)
+const UPDATES = [
+  {id:"UPD-001", entityType:"project", entityId:"PRJ-001", date:"20-08-26", author:"לירן", note:"התחלנו לאסוף רעיונות ותמונות השראה לעיצוב החדר"},
+  {id:"UPD-002", entityType:"task", entityId:"TSK-001", date:"27-08-26", author:"לירן", note:"פנינו לשרברב אבל הוא לא היה זמין השבוע, מחפשים אחר"}
+];
+
+const STATUS_LABEL = {todo:"טרם התחיל", progress:"בביצוע", waiting:"ממתין", done:"הושלם"};
+const STATUS_CLASS = {todo:"status-todo", progress:"status-progress", waiting:"status-waiting", done:"status-done"};
+const STATUS_ORDER = ["todo", "progress", "waiting", "done"];
+const TYPE_META = {
+  "חד-פעמית": {icon:"📌", cls:"type-once"},
+  "תהליכית": {icon:"🧩", cls:"type-process"}
+};
+const CATEGORY_LIST = Object.keys(CATEGORY_COLOR);
+const ASSIGNABLE_NAMES = PEOPLE.filter(p => p.assignable).map(p => p.name);
+const ALL_PEOPLE_NAMES = PEOPLE.map(p => p.name);
+const PRIORITY_OPTIONS = ["דחוף", "רגיל", "נמוך"];
+const FREQUENCY_OPTIONS = ["חד-פעמי", "שבועי", "חודשי"];
+
+function formatDateDisplay(iso) {
+  if (!iso) return null;
+  const [y, m, d] = iso.split('-');
+  return `${d}-${m}-${y.slice(2)}`;
+}
+function optionList(values, selected) {
+  return values.map(v => `<option value="${v}" ${v === selected ? 'selected' : ''}>${v}</option>`).join('');
+}
+function nextId(prefix, ids, width = 3) {
+  let max = 0;
+  const re = new RegExp('^' + prefix + '-(\\d+)$');
+  ids.forEach(id => {
+    const m = re.exec(id);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  });
+  return `${prefix}-${String(max + 1).padStart(width, '0')}`;
+}
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => { el.hidden = true; }, 2200);
+}
+function renderAll() {
+  renderKpis();
+  renderProjects(currentProjectsList());
+  renderTasks(currentTasksList());
+  renderRoutines(currentRoutinesList());
+}
+
+function getUpdates(entityType, entityId) {
+  return UPDATES.filter(u => u.entityType === entityType && u.entityId === entityId);
+}
+
+function projectProgress(p) {
+  const linked = TASKS.filter(t => t.projectId === p.id);
+  const done = linked.filter(t => t.status === "done").length;
+  const pct = linked.length ? Math.round(100 * done / linked.length) : 0;
+  return {total: linked.length, done, pct};
+}
+
+function subtaskProgress(t) {
+  const total = t.subtasks.length;
+  const done = t.subtasks.filter(s => s.done).length;
+  return {total, done};
+}
+
+function todaysCompletion(routineId) {
+  return ROUTINE_COMPLETIONS.find(c => c.routineId === routineId && c.date === TODAY_STR);
+}
+
+function kpis() {
+  const openTasks = TASKS.filter(t => t.status !== "done").length;
+  const activeProjects = PROJECTS.filter(p => p.status !== "done").length;
+  const shoppingItems = SHOPPING.length;
+  const activeRoutines = ROUTINES.filter(r => r.active);
+  const routinesDoneToday = activeRoutines.filter(r => {
+    const c = todaysCompletion(r.id);
+    return c && c.done;
+  }).length;
+  return [
+    {num: openTasks, lbl: "משימות פתוחות"},
+    {num: activeProjects, lbl: "פרויקטים פעילים"},
+    {num: `${routinesDoneToday}/${activeRoutines.length}`, lbl: "שגרות שבוצעו היום"},
+    {num: shoppingItems, lbl: "פריטי קניות"}
+  ];
+}
+
+function renderKpis() {
+  document.getElementById('kpiRow').innerHTML = kpis().map(k => `
+    <div class="kpi"><div class="num">${k.num}</div><div class="lbl">${k.lbl}</div></div>
+  `).join('');
+}
+
+function renderProjects(list) {
+  document.getElementById('projectsCards').innerHTML = list.map(p => {
+    const prog = projectProgress(p);
+    const log = getUpdates("project", p.id);
+    return `
+    <div class="card" style="border-color:${CATEGORY_COLOR[p.category]||'var(--neutral)'}">
+      <div class="top-row">
+        <h3>${p.name}</h3>
+        <div style="display:flex;gap:6px;align-items:flex-start">
+          <span class="badge status-pill ${STATUS_CLASS[p.status]}">${STATUS_LABEL[p.status]}</span>
+          <button class="icon-edit-btn" data-edit-project="${p.id}" aria-label="עריכה">✏️</button>
+        </div>
+      </div>
+      <div class="meta">
+        <span>👤 ${p.owner}</span>
+        <span>📁 ${p.category}</span>
+        <span>🎯 עדיפות: ${p.priority}</span>
+        ${p.target ? `<span>📅 יעד: ${formatDateDisplay(p.target)}</span>` : ''}
+      </div>
+      <div class="progress-row">
+        <div class="progress-track"><div class="progress-fill" style="width:${prog.pct}%"></div></div>
+        <span class="progress-label">${prog.done}/${prog.total} משימות הושלמו · ${prog.pct}%</span>
+      </div>
+      ${log.length ? `
+        <div class="log-list">
+          ${log.map(l => `<div class="log-entry">${l.note}<span class="log-meta">${l.author} · ${l.date}</span></div>`).join('')}
+        </div>
+      ` : `<div class="log-empty">אין עוד עדכונים — כאן יצטברו רשומות מתוך Updates_Log</div>`}
+    </div>
+  `;}).join('') + `<div class="card add-row" id="addProjectCard">+ פרויקט חדש</div>`;
+  document.querySelectorAll('[data-edit-project]').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); openItemForm('project', btn.dataset.editProject); });
+  });
+  const addCard = document.getElementById('addProjectCard');
+  if (addCard) addCard.addEventListener('click', () => openItemForm('project'));
+}
+
+function renderTasks(list) {
+  document.getElementById('tasksTable').innerHTML = `
+    <thead><tr><th>משימה</th><th>תחום</th><th>אחראי</th><th>תאריך</th><th>סטטוס</th><th>התקדמות</th><th>נוגע ל</th><th></th></tr></thead>
+    <tbody>
+      ${list.map(t => {
+        const sp = subtaskProgress(t);
+        const pct = sp.total ? Math.round(100 * sp.done / sp.total) : 0;
+        const progressCell = sp.total
+          ? `<div class="progress-cell"><div class="progress-track-sm"><div class="progress-fill-sm" style="width:${pct}%"></div></div><span class="progress-text">${sp.done}/${sp.total}</span></div>`
+          : `<span class="progress-text">—</span>`;
+        const relatedCell = t.relatedPerson ? `<span class="related-badge">👶 ${t.relatedPerson}</span>` : '';
+        const type = TYPE_META[t.taskType];
+        const dateCell = [formatDateDisplay(t.dueDate), t.dueTime].filter(Boolean).join(' · ') || '—';
+        return `
+        <tr class="task-row" data-task-id="${t.id}" tabindex="0">
+          <td><span class="type-icon ${type.cls}" title="${t.taskType}">${type.icon}</span>${t.name}</td>
+          <td>${t.category}</td>
+          <td>${t.owner}</td>
+          <td style="color:var(--text-secondary)">${dateCell}</td>
+          <td><span class="badge status-pill ${STATUS_CLASS[t.status]}">${STATUS_LABEL[t.status]}</span></td>
+          <td>${progressCell}</td>
+          <td>${relatedCell}</td>
+          <td class="chevron">›</td>
+        </tr>
+      `;}).join('')}
+    </tbody>
+  `;
+  document.querySelectorAll('#tasksTable tr.task-row').forEach(row => {
+    row.addEventListener('click', () => openTaskDetail(row.dataset.taskId));
+    row.addEventListener('keydown', e => { if (e.key === 'Enter') openTaskDetail(row.dataset.taskId); });
+  });
+}
+
+function renderRoutines(list) {
+  document.getElementById('routinesGrid').innerHTML = list.map(r => {
+    const today = todaysCompletion(r.id);
+    const isDone = !!(today && today.done);
+    const historyDots = HISTORY_DATES.map(d => {
+      const c = ROUTINE_COMPLETIONS.find(x => x.routineId === r.id && x.date === d);
+      const cls = c ? (c.done ? 'done' : 'missed') : '';
+      return `<span class="hist-dot ${cls}" title="${DATE_LABEL[d]}${c ? (c.done ? ' · בוצע' : ' · לא בוצע') : ' · אין נתון'}"></span>`;
+    }).join('');
+    return `
+    <div class="routine-card" style="border-color:${CATEGORY_COLOR[r.category]||'var(--neutral)'}">
+      <div class="routine-top">
+        <div>
+          <h3>${r.name}</h3>
+          <div class="meta" style="margin-top:4px"><span>👤 ${r.assignee}</span><span>📁 ${r.category}</span></div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="icon-edit-btn" data-edit-routine="${r.id}" aria-label="עריכה">✏️</button>
+          <button class="routine-toggle ${isDone ? 'done' : 'pending'}" data-routine-id="${r.id}">
+            ${isDone ? '✓ בוצע היום' : 'סמן כבוצע'}
+          </button>
+        </div>
+      </div>
+      ${r.notes ? `<div class="log-empty" style="font-style:normal">${r.notes}</div>` : ''}
+      <div class="routine-history">
+        <span class="hist-lbl">3 ימים אחרונים:</span>${historyDots}
+      </div>
+    </div>
+  `;}).join('');
+  document.querySelectorAll('.routine-toggle').forEach(btn => {
+    btn.addEventListener('click', () => toggleRoutineToday(btn.dataset.routineId));
+  });
+  document.querySelectorAll('[data-edit-routine]').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); openItemForm('routine', btn.dataset.editRoutine); });
+  });
+}
+
+function toggleRoutineToday(routineId) {
+  let entry = todaysCompletion(routineId);
+  if (!entry) {
+    entry = {routineId, date: TODAY_STR, done: false, by: null};
+    ROUTINE_COMPLETIONS.push(entry);
+  }
+  entry.done = !entry.done;
+  entry.by = entry.done ? "לירן" : null;
+  renderRoutines(currentRoutinesList());
+  renderKpis();
+}
+
+function renderShopping(list) {
+  document.getElementById('shopTable').innerHTML = `
+    <thead><tr><th>פריט</th><th>קטגוריה</th><th>סטטוס</th><th>חנות</th></tr></thead>
+    <tbody>
+      ${list.map(s => `<tr><td>${s.name}</td><td>${s.category}</td><td>${s.status}</td><td>${s.store}</td></tr>`).join('')}
+    </tbody>
+  `;
+}
+
+function renderPeople(list) {
+  document.getElementById('peopleGrid').innerHTML = list.map(p => `
+    <div class="person-card" style="border-color:${p.assignable ? 'var(--accent-parent)' : 'var(--accent-child)'}">
+      <div class="person-avatar" style="background:${p.assignable ? 'var(--accent-parent)' : 'var(--accent-child)'}">${p.assignable ? '👤' : '👶'}</div>
+      <div>
+        <div class="person-name">${p.name}</div>
+        <div class="person-role">${p.role}${p.assignable ? ' · יכול/ה להיות אחראי/ת על משימות' : ' · מוזכר/ת כ"נוגע ל" במשימות'}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ---- Task detail modal ----
+function openTaskDetail(taskId) {
+  const t = TASKS.find(x => x.id === taskId);
+  if (!t) return;
+  const type = TYPE_META[t.taskType];
+  const project = t.projectId ? PROJECTS.find(p => p.id === t.projectId) : null;
+  const projProg = project ? projectProgress(project) : null;
+  const log = getUpdates("task", t.id);
+  const dateVal = [formatDateDisplay(t.dueDate), t.dueTime].filter(Boolean).join(' · ') || '—';
+
+  const metaItems = [
+    ['תחום', t.category],
+    ['אחראי', t.owner],
+    ['סוג משימה', `${type.icon} ${t.taskType}`],
+    ['סטטוס', STATUS_LABEL[t.status]],
+    ['תאריך יעד', dateVal],
+    ['תדירות', t.frequency],
+    ['עדיפות', t.priority],
+    ['נוגע ל', t.relatedPerson || '—']
+  ];
+
+  document.getElementById('taskModal').innerHTML = `
+    <div class="modal-header">
+      <h2>${type.icon} ${t.name}</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="icon-edit-btn" id="modalEditBtn" aria-label="עריכה">✏️ עריכה</button>
+        <button class="modal-close" id="modalCloseBtn" aria-label="סגירה">✕</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-meta-grid">
+        ${metaItems.map(([k, v]) => `<div class="meta-item"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}
+      </div>
+
+      ${t.next && t.next !== '—' ? `
+        <div class="modal-section">
+          <h4>השלב הבא</h4>
+          <p style="font-size:13.5px;color:var(--text-primary)">${t.next}</p>
+        </div>
+      ` : ''}
+
+      ${project ? `
+        <div class="modal-section">
+          <h4>פרויקט מקושר</h4>
+          <div class="project-link-card">
+            <span class="plc-name">🧩 ${project.name}</span>
+            <div class="progress-row" style="margin-top:0">
+              <div class="progress-track"><div class="progress-fill" style="width:${projProg.pct}%"></div></div>
+              <span class="progress-label">${projProg.done}/${projProg.total} משימות הושלמו · ${projProg.pct}%</span>
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="modal-section">
+        <h4>תתי-משימות ${t.subtasks.length ? `(${subtaskProgress(t).done}/${subtaskProgress(t).total})` : ''}</h4>
+        ${t.subtasks.length ? `
+          <div class="subtask-list" id="modalSubtaskList">
+            ${t.subtasks.map((s, i) => `
+              <div class="subtask-item ${s.done ? 'done' : ''}">
+                <input type="checkbox" data-idx="${i}" ${s.done ? 'checked' : ''} id="stx-${i}">
+                <label for="stx-${i}" style="flex:1;cursor:pointer">
+                  <div class="stx-name">${s.name}</div>
+                  ${s.notes ? `<div class="stx-note">${s.notes}</div>` : ''}
+                </label>
+              </div>
+            `).join('')}
+          </div>
+        ` : `<p style="font-size:13px;color:var(--text-secondary);font-style:italic">אין תתי-משימות למשימה מסוג "${t.taskType}"</p>`}
+      </div>
+
+      <div class="modal-section">
+        <h4>לוג עדכונים</h4>
+        ${log.length ? `
+          <div class="log-list">
+            ${log.map(l => `<div class="log-entry">${l.note}<span class="log-meta">${l.author} · ${l.date}</span></div>`).join('')}
+          </div>
+        ` : `<div class="log-empty">אין עוד עדכונים למשימה הזו</div>`}
+      </div>
+    </div>
+  `;
+
+  document.getElementById('modalCloseBtn').addEventListener('click', closeTaskDetail);
+  document.getElementById('modalEditBtn').addEventListener('click', () => openItemForm('task', taskId));
+  const list = document.getElementById('modalSubtaskList');
+  if (list) {
+    list.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        t.subtasks[+cb.dataset.idx].done = cb.checked;
+        openTaskDetail(taskId);   // re-render modal with fresh progress
+        renderTasks(currentTasksList());  // keep table in sync
+      });
+    });
+  }
+
+  document.getElementById('taskModalOverlay').hidden = false;
+}
+
+function closeTaskDetail() {
+  document.getElementById('taskModalOverlay').hidden = true;
+}
+document.getElementById('taskModalOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'taskModalOverlay') closeTaskDetail();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeTaskDetail();
+});
+
+// ---- Add / edit forms ----
+function subtaskRowHtml(id, name, notes) {
+  const nameVal = name ? String(name).replace(/"/g, '&quot;') : '';
+  const notesVal = notes ? String(notes).replace(/"/g, '&quot;') : '';
+  return `
+    <div class="subtask-row" data-existing-id="${id || ''}">
+      <input type="text" class="stx-name-input" placeholder="שם תת-משימה" value="${nameVal}">
+      <input type="text" class="stx-notes-input" placeholder="הערה (לא חובה)" value="${notesVal}">
+      <button type="button" class="remove-subtask-row" aria-label="הסרה">✕</button>
+    </div>`;
+}
+
+function taskFormBody(existing) {
+  const isEdit = !!existing;
+  const t = existing || {};
+  const taskType = t.taskType || "חד-פעמית";
+  const subtasksHtml = (t.subtasks || []).map(s => subtaskRowHtml(s.id, s.name, s.notes)).join('');
+  const nameVal = t.name ? t.name.replace(/"/g, '&quot;') : '';
+  const nextVal = t.next && t.next !== '—' ? t.next.replace(/"/g, '&quot;') : '';
+  return `
+    <div class="modal-header">
+      <h2>${isEdit ? '✏️ עריכת משימה' : '+ משימה חדשה'}</h2>
+      <button class="modal-close" id="modalCloseBtn" aria-label="סגירה">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="itemForm">
+        <div class="type-toggle">
+          <label class="type-option ${taskType === 'חד-פעמית' ? 'selected' : ''}">
+            <input type="radio" name="taskType" value="חד-פעמית" ${taskType === 'חד-פעמית' ? 'checked' : ''}>
+            📌 חד-פעמית
+          </label>
+          <label class="type-option ${taskType === 'תהליכית' ? 'selected' : ''}">
+            <input type="radio" name="taskType" value="תהליכית" ${taskType === 'תהליכית' ? 'checked' : ''}>
+            🧩 תהליכית (עם תתי-משימות)
+          </label>
+        </div>
+
+        <div class="form-field">
+          <label for="f-name">שם המשימה</label>
+          <input type="text" id="f-name" required value="${nameVal}">
+        </div>
+
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="f-category">תחום</label>
+            <select id="f-category">${optionList(CATEGORY_LIST, t.category)}</select>
+          </div>
+          <div class="form-field">
+            <label for="f-owner">אחראי</label>
+            <select id="f-owner">${optionList(ASSIGNABLE_NAMES, t.owner)}</select>
+          </div>
+          <div class="form-field">
+            <label for="f-status">סטטוס</label>
+            <select id="f-status">${STATUS_ORDER.map(s => `<option value="${s}" ${s === t.status ? 'selected' : ''}>${STATUS_LABEL[s]}</option>`).join('')}</select>
+          </div>
+          <div class="form-field">
+            <label for="f-priority">עדיפות</label>
+            <select id="f-priority">${optionList(PRIORITY_OPTIONS, t.priority || 'רגיל')}</select>
+          </div>
+          <div class="form-field">
+            <label for="f-frequency">תדירות</label>
+            <select id="f-frequency">${optionList(FREQUENCY_OPTIONS, t.frequency || 'חד-פעמי')}</select>
+          </div>
+          <div class="form-field">
+            <label for="f-dueDate">תאריך יעד</label>
+            <input type="date" id="f-dueDate" value="${t.dueDate || ''}">
+          </div>
+          <div class="form-field">
+            <label for="f-dueTime">שעה</label>
+            <input type="time" id="f-dueTime" value="${t.dueTime || ''}">
+          </div>
+          <div class="form-field">
+            <label for="f-relatedPerson">נוגע ל (לא חובה)</label>
+            <select id="f-relatedPerson">
+              <option value="">—</option>
+              ${optionList(ALL_PEOPLE_NAMES, t.relatedPerson)}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="f-projectId">פרויקט מקושר (לא חובה)</label>
+            <select id="f-projectId">
+              <option value="">—</option>
+              ${PROJECTS.map(p => `<option value="${p.id}" ${p.id === t.projectId ? 'selected' : ''}>${p.name}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="f-next">השלב הבא (לא חובה)</label>
+          <input type="text" id="f-next" value="${nextVal}">
+        </div>
+
+        <div class="modal-section" id="subtaskSection" style="display:${taskType === 'תהליכית' ? 'block' : 'none'}">
+          <h4>תתי-משימות</h4>
+          <div class="subtask-builder" id="subtaskBuilder">${subtasksHtml}</div>
+          <button type="button" class="btn-secondary" id="addSubtaskRowBtn" style="margin-top:8px">+ הוסף תת-משימה</button>
+        </div>
+
+        <div class="form-actions">
+          <div>${isEdit ? `<button type="button" class="btn-danger-text" id="deleteItemBtn">מחיקה</button>` : ''}</div>
+          <div class="form-actions-right">
+            <button type="button" class="btn-secondary" id="cancelFormBtn">ביטול</button>
+            <button type="submit" class="btn-primary">${isEdit ? 'שמירה' : 'הוספה'}</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+function routineFormBody(existing) {
+  const isEdit = !!existing;
+  const r = existing || {};
+  const nameVal = r.name ? r.name.replace(/"/g, '&quot;') : '';
+  const notesVal = r.notes ? r.notes.replace(/"/g, '&quot;') : '';
+  return `
+    <div class="modal-header">
+      <h2>${isEdit ? '✏️ עריכת שגרה' : '+ שגרה יומית חדשה'}</h2>
+      <button class="modal-close" id="modalCloseBtn" aria-label="סגירה">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="itemForm">
+        <div class="form-field">
+          <label for="f-name">שם השגרה</label>
+          <input type="text" id="f-name" required value="${nameVal}">
+        </div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="f-category">תחום</label>
+            <select id="f-category">${optionList(CATEGORY_LIST, r.category)}</select>
+          </div>
+          <div class="form-field">
+            <label for="f-assignee">אחראי</label>
+            <select id="f-assignee">${optionList(ASSIGNABLE_NAMES, r.assignee)}</select>
+          </div>
+          <div class="form-field">
+            <label for="f-active">פעילה</label>
+            <select id="f-active">
+              <option value="true" ${r.active !== false ? 'selected' : ''}>כן</option>
+              <option value="false" ${r.active === false ? 'selected' : ''}>לא</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="f-notes">הערות (לא חובה)</label>
+          <input type="text" id="f-notes" value="${notesVal}">
+        </div>
+        <div class="form-actions">
+          <div>${isEdit ? `<button type="button" class="btn-danger-text" id="deleteItemBtn">מחיקה</button>` : ''}</div>
+          <div class="form-actions-right">
+            <button type="button" class="btn-secondary" id="cancelFormBtn">ביטול</button>
+            <button type="submit" class="btn-primary">${isEdit ? 'שמירה' : 'הוספה'}</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+function projectFormBody(existing) {
+  const isEdit = !!existing;
+  const p = existing || {};
+  const nameVal = p.name ? p.name.replace(/"/g, '&quot;') : '';
+  const notesVal = p.notes ? p.notes.replace(/"/g, '&quot;') : '';
+  return `
+    <div class="modal-header">
+      <h2>${isEdit ? '✏️ עריכת פרויקט' : '+ פרויקט חדש'}</h2>
+      <button class="modal-close" id="modalCloseBtn" aria-label="סגירה">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="itemForm">
+        <div class="form-field">
+          <label for="f-name">שם הפרויקט</label>
+          <input type="text" id="f-name" required value="${nameVal}">
+        </div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="f-category">תחום</label>
+            <select id="f-category">${optionList(CATEGORY_LIST, p.category)}</select>
+          </div>
+          <div class="form-field">
+            <label for="f-owner">אחראי</label>
+            <select id="f-owner">${optionList(ASSIGNABLE_NAMES, p.owner)}</select>
+          </div>
+          <div class="form-field">
+            <label for="f-status">סטטוס</label>
+            <select id="f-status">${STATUS_ORDER.map(s => `<option value="${s}" ${s === p.status ? 'selected' : ''}>${STATUS_LABEL[s]}</option>`).join('')}</select>
+          </div>
+          <div class="form-field">
+            <label for="f-priority">עדיפות</label>
+            <select id="f-priority">${optionList(PRIORITY_OPTIONS, p.priority || 'רגיל')}</select>
+          </div>
+          <div class="form-field">
+            <label for="f-target">יעד לסיום (לא חובה)</label>
+            <input type="date" id="f-target" value="${p.target || ''}">
+          </div>
+          <div class="form-field">
+            <label for="f-budget">תקציב (לא חובה)</label>
+            <input type="number" id="f-budget" value="${p.budget != null ? p.budget : ''}">
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="f-notes">הערות (לא חובה)</label>
+          <input type="text" id="f-notes" value="${notesVal}">
+        </div>
+        <div class="form-actions">
+          <div>${isEdit ? `<button type="button" class="btn-danger-text" id="deleteItemBtn">מחיקה</button>` : ''}</div>
+          <div class="form-actions-right">
+            <button type="button" class="btn-secondary" id="cancelFormBtn">ביטול</button>
+            <button type="submit" class="btn-primary">${isEdit ? 'שמירה' : 'הוספה'}</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+let currentFormKind = null;
+let currentFormId = null;
+
+function openItemForm(kind, id = null) {
+  currentFormKind = kind;
+  currentFormId = id;
+  let existing = null;
+  if (id) {
+    if (kind === 'task') existing = TASKS.find(x => x.id === id);
+    if (kind === 'routine') existing = ROUTINES.find(x => x.id === id);
+    if (kind === 'project') existing = PROJECTS.find(x => x.id === id);
+  }
+  const body = kind === 'task' ? taskFormBody(existing)
+    : kind === 'routine' ? routineFormBody(existing)
+    : projectFormBody(existing);
+  document.getElementById('taskModal').innerHTML = body;
+  wireFormEvents(kind, existing);
+  document.getElementById('taskModalOverlay').hidden = false;
+}
+
+function wireSubtaskRemoveButtons() {
+  document.querySelectorAll('.remove-subtask-row').forEach(btn => {
+    btn.onclick = () => btn.closest('.subtask-row').remove();
+  });
+}
+
+function wireFormEvents(kind, existing) {
+  document.getElementById('modalCloseBtn').addEventListener('click', closeTaskDetail);
+  document.getElementById('cancelFormBtn').addEventListener('click', closeTaskDetail);
+
+  if (kind === 'task') {
+    const toggleSubtaskSection = () => {
+      const val = document.querySelector('input[name="taskType"]:checked').value;
+      document.getElementById('subtaskSection').style.display = val === 'תהליכית' ? 'block' : 'none';
+      document.querySelectorAll('.type-option').forEach(el => {
+        el.classList.toggle('selected', el.querySelector('input').value === val);
+      });
+    };
+    document.querySelectorAll('input[name="taskType"]').forEach(r => r.addEventListener('change', toggleSubtaskSection));
+    document.getElementById('addSubtaskRowBtn').addEventListener('click', () => {
+      document.getElementById('subtaskBuilder').insertAdjacentHTML('beforeend', subtaskRowHtml(null, '', ''));
+      wireSubtaskRemoveButtons();
+    });
+    wireSubtaskRemoveButtons();
+  }
+
+  if (existing) {
+    const delBtn = document.getElementById('deleteItemBtn');
+    if (delBtn) wireDeleteButton(delBtn, kind, existing.id);
+  }
+
+  document.getElementById('itemForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const ok = saveItemFromForm(kind, existing);
+    if (ok) {
+      closeTaskDetail();
+      renderAll();
+      showToast(existing ? 'העדכון נשמר' : 'נוסף בהצלחה');
+    }
+  });
+}
+
+function wireDeleteButton(btn, kind, id) {
+  let armed = false;
+  let timer = null;
+  btn.addEventListener('click', () => {
+    if (!armed) {
+      armed = true;
+      btn.textContent = 'לאשר מחיקה?';
+      timer = setTimeout(() => { armed = false; btn.textContent = 'מחיקה'; }, 3000);
+    } else {
+      clearTimeout(timer);
+      deleteItem(kind, id);
+    }
+  });
+}
+
+function deleteItem(kind, id) {
+  if (kind === 'task') {
+    const i = TASKS.findIndex(x => x.id === id);
+    if (i > -1) TASKS.splice(i, 1);
+  } else if (kind === 'routine') {
+    const i = ROUTINES.findIndex(x => x.id === id);
+    if (i > -1) ROUTINES.splice(i, 1);
+  } else if (kind === 'project') {
+    const i = PROJECTS.findIndex(x => x.id === id);
+    if (i > -1) PROJECTS.splice(i, 1);
+  }
+  closeTaskDetail();
+  renderAll();
+  showToast('נמחק');
+}
+
+function saveItemFromForm(kind, existing) {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) return false;
+
+  if (kind === 'task') {
+    const taskType = document.querySelector('input[name="taskType"]:checked').value;
+    let subtasks = [];
+    if (taskType === 'תהליכית') {
+      const existingSubtasks = existing ? existing.subtasks : [];
+      document.querySelectorAll('#subtaskBuilder .subtask-row').forEach(row => {
+        const sName = row.querySelector('.stx-name-input').value.trim();
+        if (!sName) return;
+        const sNotes = row.querySelector('.stx-notes-input').value.trim();
+        const existingId = row.dataset.existingId;
+        let sub = existingId ? existingSubtasks.find(s => s.id === existingId) : null;
+        if (sub) {
+          sub.name = sName;
+          if (sNotes) sub.notes = sNotes; else delete sub.notes;
+        } else {
+          sub = {id: nextId('SUB', [...existingSubtasks.map(s => s.id), ...subtasks.map(s => s.id)], 3), name: sName, done: false};
+          if (sNotes) sub.notes = sNotes;
+        }
+        subtasks.push(sub);
+      });
+    }
+    const obj = {
+      name,
+      category: document.getElementById('f-category').value,
+      owner: document.getElementById('f-owner').value,
+      status: document.getElementById('f-status').value,
+      taskType,
+      dueDate: document.getElementById('f-dueDate').value || null,
+      dueTime: document.getElementById('f-dueTime').value || null,
+      frequency: document.getElementById('f-frequency').value,
+      priority: document.getElementById('f-priority').value,
+      next: document.getElementById('f-next').value.trim() || '—',
+      relatedPerson: document.getElementById('f-relatedPerson').value || null,
+      projectId: document.getElementById('f-projectId').value || null,
+      subtasks
+    };
+    if (existing) {
+      Object.assign(existing, obj);
+    } else {
+      obj.id = nextId('TSK', TASKS.map(t => t.id));
+      TASKS.push(obj);
+    }
+  } else if (kind === 'routine') {
+    const obj = {
+      name,
+      category: document.getElementById('f-category').value,
+      assignee: document.getElementById('f-assignee').value,
+      active: document.getElementById('f-active').value === 'true',
+      notes: document.getElementById('f-notes').value.trim() || null
+    };
+    if (existing) {
+      Object.assign(existing, obj);
+    } else {
+      obj.id = nextId('ROU', ROUTINES.map(r => r.id));
+      ROUTINES.push(obj);
+    }
+  } else if (kind === 'project') {
+    const budgetVal = document.getElementById('f-budget').value;
+    const obj = {
+      name,
+      category: document.getElementById('f-category').value,
+      owner: document.getElementById('f-owner').value,
+      status: document.getElementById('f-status').value,
+      priority: document.getElementById('f-priority').value,
+      target: document.getElementById('f-target').value || null,
+      budget: budgetVal !== '' ? Number(budgetVal) : null,
+      notes: document.getElementById('f-notes').value.trim() || null
+    };
+    if (existing) {
+      Object.assign(existing, obj);
+    } else {
+      obj.id = nextId('PRJ', PROJECTS.map(p => p.id));
+      PROJECTS.push(obj);
+    }
+  }
+  return true;
+}
+
+// ---- Filters (category filter, shared across relevant tabs) ----
+let activeCategoryFilter = "";
+function currentTasksList() {
+  return activeCategoryFilter ? TASKS.filter(t => t.category === activeCategoryFilter) : TASKS;
+}
+function currentRoutinesList() {
+  return activeCategoryFilter ? ROUTINES.filter(r => r.category === activeCategoryFilter) : ROUTINES;
+}
+function currentProjectsList() {
+  return activeCategoryFilter ? PROJECTS.filter(p => p.category === activeCategoryFilter) : PROJECTS;
+}
+
+const categories = [...new Set(TASKS.map(t => t.category))];
+document.getElementById('filters').innerHTML = `
+  <select id="catFilter">
+    <option value="">כל התחומים</option>
+    ${categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+  </select>
+`;
+document.getElementById('catFilter').addEventListener('change', (e) => {
+  activeCategoryFilter = e.target.value;
+  renderProjects(currentProjectsList());
+  renderTasks(currentTasksList());
+  renderRoutines(currentRoutinesList());
+});
+
+renderKpis();
+renderProjects(PROJECTS);
+renderTasks(TASKS);
+renderRoutines(ROUTINES);
+renderShopping(SHOPPING);
+renderPeople(PEOPLE);
+
+document.getElementById('addTaskBtn').addEventListener('click', () => openItemForm('task'));
+document.getElementById('addRoutineBtn').addEventListener('click', () => openItemForm('routine'));
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('sec-' + tab.dataset.tab).classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

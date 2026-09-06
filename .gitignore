@@ -1,0 +1,12 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Node (only used for a local static server, no build step)
+node_modules/
+npm-debug.log*
+
+# Local scratch
+scratch/
+*.local
