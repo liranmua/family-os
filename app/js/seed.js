@@ -77,6 +77,11 @@ export function buildSeed() {
       { name: "חלב", category: "אוכל", qty: "2", status: "חסר", store: "סופר" },
       { name: "נייר טואלט", category: "טואלטיקה", qty: "1", status: "חסר", store: "פארם" },
     ],
+    finance: {
+      budgetFree: 2400,
+      savingsGoalPct: 35,
+      openDecisions: ["האם להקדים סגירת משכנתא או להשאיר כרית ביטחון", "תקרת תקציב לחדר המשחקים"],
+    },
     updatesLog: [
       { id: "UPD-001", entityType: "project", entityId: "PRJ-001", date: plusDays(-10), author: "לירן", note: "התחלנו לאסוף רעיונות ותמונות השראה לעיצוב החדר" },
       { id: "UPD-002", entityType: "task", entityId: "TSK-001", date: plusDays(-3), author: "לירן", note: "פנינו לשרברב אבל הוא לא היה זמין השבוע, מחפשים אחר" },

@@ -4,6 +4,8 @@
 import * as db from "./db.js";
 import { buildSeed, SEED_VERSION } from "./seed.js";
 
+export const FINANCE_DEFAULT = { budgetFree: null, savingsGoalPct: null, openDecisions: [] };
+
 export const state = {
   tasks: [],
   routines: [],
@@ -11,6 +13,7 @@ export const state = {
   projects: [],
   shopping: [],
   updatesLog: [],
+  finance: { ...FINANCE_DEFAULT },
 };
 
 // ---- טעינה / זריעה ----
@@ -35,6 +38,12 @@ export async function loadState() {
   state.projects = projects;
   state.shopping = shopping;
   state.updatesLog = updatesLog;
+  state.finance = { ...FINANCE_DEFAULT, ...(await getMeta("finance", {})) };
+}
+
+export async function saveFinance(finance) {
+  state.finance = { ...FINANCE_DEFAULT, ...finance };
+  await setMeta("finance", state.finance);
 }
 
 async function seedFresh() {
@@ -47,6 +56,7 @@ async function seedFresh() {
     db.bulkPut("shopping", s.shopping),
     db.bulkPut("updatesLog", s.updatesLog),
   ]);
+  if (s.finance) await db.put("meta", { key: "finance", value: s.finance });
   await db.put("meta", { key: "seedVersion", value: SEED_VERSION });
 }
 

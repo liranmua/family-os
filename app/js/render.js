@@ -6,7 +6,7 @@ import {
   CATEGORY_COLOR, PEOPLE, STATUS_LABEL, STATUS_CLASS, TYPE_META,
   formatDateDisplay, todayStr, esc,
 } from "./constants.js";
-import { openItemForm, openTaskDetail } from "./forms.js";
+import { openItemForm, openTaskDetail, openUpdateForm, openFinanceForm } from "./forms.js";
 
 let activeCategoryFilter = "";
 export function setCategoryFilter(v) { activeCategoryFilter = v; }
@@ -94,9 +94,13 @@ export function renderProjects() {
           <div class="progress-track"><div class="progress-fill" style="width:${prog.pct}%"></div></div>
           <span class="progress-label">${prog.done}/${prog.total} משימות הושלמו · ${prog.pct}%</span>
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+          <span class="hist-lbl" style="font-size:11px;color:var(--text-secondary)">לוג עדכונים${log.length ? ` (${log.length})` : ""}</span>
+          <button class="icon-edit-btn" data-add-update="${esc(p.id)}">+ עדכון</button>
+        </div>
         ${
           log.length
-            ? `<div class="log-list">${log
+            ? `<div class="log-list" style="margin-top:6px">${log
                 .map((l) => `<div class="log-entry">${esc(l.note)}<span class="log-meta">${esc(l.author)} · ${formatDateDisplay(l.date) || esc(l.date)}</span></div>`)
                 .join("")}</div>`
             : `<div class="log-empty">אין עוד עדכונים לפרויקט הזה</div>`
@@ -107,6 +111,9 @@ export function renderProjects() {
 
   el.querySelectorAll("[data-edit-project]").forEach((btn) =>
     btn.addEventListener("click", (e) => { e.stopPropagation(); openItemForm("project", btn.dataset.editProject); })
+  );
+  el.querySelectorAll("[data-add-update]").forEach((btn) =>
+    btn.addEventListener("click", (e) => { e.stopPropagation(); openUpdateForm("project", btn.dataset.addUpdate); })
   );
   const addCard = document.getElementById("addProjectCard");
   if (addCard) addCard.addEventListener("click", () => openItemForm("project"));
@@ -236,6 +243,50 @@ export function renderShopping() {
   });
 }
 
+// ---- Finance (תצוגה מופשטת — לא טבלת נתונים גולמית) ----
+
+export function renderFinance() {
+  const el = document.getElementById("financeCard");
+  if (!el) return;
+  const f = state.finance || {};
+  const decisions = Array.isArray(f.openDecisions) ? f.openDecisions.filter(Boolean) : [];
+  const hasData = f.budgetFree != null || f.savingsGoalPct != null || decisions.length > 0;
+  el.hidden = false;
+
+  const budget = f.budgetFree != null ? `₪ ${Number(f.budgetFree).toLocaleString("he-IL")}` : "—";
+  const goalPct = f.savingsGoalPct != null ? Math.max(0, Math.min(100, Number(f.savingsGoalPct))) : null;
+
+  el.innerHTML = `
+    <div class="fc-head">
+      <h3>💰 תמונת פיננסים — מבט מהיר</h3>
+      <button class="icon-edit-btn" id="editFinanceBtn">${hasData ? "✏️ עדכון" : "הגדרה"}</button>
+    </div>
+    ${
+      hasData
+        ? `<div class="finance-metrics">
+            <div class="fc-metric"><div class="fc-k">תקציב פנוי החודש</div><div class="fc-v">${budget}</div></div>
+            <div class="fc-metric">
+              <div class="fc-k">התקדמות ליעד חיסכון</div>
+              ${
+                goalPct != null
+                  ? `<div class="fc-v">${goalPct}%</div>
+                     <div class="progress-track" style="margin-top:6px"><div class="progress-fill" style="width:${goalPct}%"></div></div>`
+                  : `<div class="fc-v">—</div>`
+              }
+            </div>
+            <div class="fc-metric"><div class="fc-k">החלטות שממתינות לשנינו</div><div class="fc-v">${decisions.length}</div></div>
+          </div>
+          ${
+            decisions.length
+              ? `<div class="fc-decisions"><div class="fc-k">החלטות פתוחות</div><ul>${decisions.map((d) => `<li>${esc(d)}</li>`).join("")}</ul></div>`
+              : ""
+          }`
+        : `<div class="log-empty" style="margin:0">עדיין לא הוגדר. כאן יופיעו 2–3 מדדים בלבד — תקציב פנוי, יעד חיסכון, והחלטות שדורשות את שניכם — בלי טבלאות.</div>`
+    }`;
+
+  document.getElementById("editFinanceBtn").addEventListener("click", openFinanceForm);
+}
+
 // ---- People ----
 
 export function renderPeople() {
@@ -258,6 +309,7 @@ export function setRoutineToggleHandler(fn) { _onRoutineToggle = fn; }
 
 export function renderAll() {
   renderKpis();
+  renderFinance();
   renderProjects();
   renderTasks();
   renderRoutines(_onRoutineToggle);

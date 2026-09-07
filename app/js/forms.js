@@ -1,11 +1,11 @@
 // Family OS — מודאל פירוט משימה + טופסי הוספה/עריכה/מחיקה.
 // מבוסס family_hub_dashboard.html. כל שמירה עוברת דרך state.js (write-through ל-IndexedDB).
 
-import { state, upsert, remove } from "./state.js";
+import { state, upsert, remove, saveFinance } from "./state.js";
 import {
   CATEGORY_LIST, ASSIGNABLE_NAMES, ALL_PEOPLE_NAMES, STATUS_LABEL, STATUS_ORDER,
   TYPE_META, PRIORITY_OPTIONS, FREQUENCY_OPTIONS, SHOP_STATUS_OPTIONS, SHOP_CATEGORY_OPTIONS,
-  optionList, formatDateDisplay, nextId, esc, escAttr,
+  optionList, formatDateDisplay, nextId, todayStr, esc, escAttr,
 } from "./constants.js";
 import { renderAll, projectProgress, subtaskProgress } from "./render.js";
 
@@ -101,7 +101,10 @@ export function openTaskDetail(taskId) {
         }
       </div>
       <div class="modal-section">
-        <h4>לוג עדכונים</h4>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+          <h4 style="margin:0">לוג עדכונים</h4>
+          <button class="icon-edit-btn" id="addUpdateBtn">+ עדכון</button>
+        </div>
         ${
           log.length
             ? `<div class="log-list">${log
@@ -115,6 +118,7 @@ export function openTaskDetail(taskId) {
 
   document.getElementById("modalCloseBtn").addEventListener("click", closeModal);
   document.getElementById("modalEditBtn").addEventListener("click", () => openItemForm("task", taskId));
+  document.getElementById("addUpdateBtn").addEventListener("click", () => openUpdateForm("task", taskId));
 
   const listEl = document.getElementById("modalSubtaskList");
   if (listEl) {
@@ -127,6 +131,113 @@ export function openTaskDetail(taskId) {
       });
     });
   }
+}
+
+// ---- הוספת רשומה ללוג עדכונים ----
+
+export function openUpdateForm(entityType, entityId) {
+  const label = entityType === "project" ? "הפרויקט" : "המשימה";
+  openModal(`
+    <div class="modal-header">
+      <h2>+ עדכון ל${label}</h2>
+      <button class="modal-close" id="modalCloseBtn" aria-label="סגירה">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="updateForm" novalidate>
+        <div class="form-field">
+          <label for="u-note">מה קרה / מה השתנה <span class="req-hint">*</span></label>
+          <textarea id="u-note" required></textarea>
+        </div>
+        <div class="form-grid">
+          <div class="form-field"><label for="u-author">מי מעדכן</label><select id="u-author">${optionList(ASSIGNABLE_NAMES, ASSIGNABLE_NAMES[0])}</select></div>
+          <div class="form-field"><label for="u-date">תאריך</label><input type="date" id="u-date" value="${escAttr(todayStr())}"></div>
+        </div>
+        <div class="field-error" id="formError" hidden></div>
+        <div class="form-actions">
+          <div></div>
+          <div class="form-actions-right">
+            <button type="button" class="btn-secondary" id="cancelFormBtn">ביטול</button>
+            <button type="submit" class="btn-primary">הוספה</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  `);
+
+  const back = () => (entityType === "task" ? openTaskDetail(entityId) : (closeModal(), renderAll()));
+  document.getElementById("modalCloseBtn").addEventListener("click", back);
+  document.getElementById("cancelFormBtn").addEventListener("click", back);
+  document.getElementById("updateForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const note = document.getElementById("u-note").value.trim();
+    const err = document.getElementById("formError");
+    if (!note) { err.textContent = "צריך לכתוב מה השתנה."; err.hidden = false; return; }
+    await upsert("update", {
+      id: nextId("UPD", state.updatesLog.map((u) => u.id)),
+      entityType,
+      entityId,
+      date: document.getElementById("u-date").value || todayStr(),
+      author: document.getElementById("u-author").value,
+      note,
+    });
+    renderAll();
+    showToast("העדכון נוסף ללוג");
+    if (entityType === "task") openTaskDetail(entityId);
+    else closeModal();
+  });
+}
+
+// ---- טופס פיננסים (מדדים מופשטים בלבד) ----
+
+export function openFinanceForm() {
+  const f = state.finance || {};
+  openModal(`
+    <div class="modal-header">
+      <h2>💰 תמונת פיננסים</h2>
+      <button class="modal-close" id="modalCloseBtn" aria-label="סגירה">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="financeForm" novalidate>
+        <p style="font-size:12.5px;color:var(--text-secondary);margin-bottom:6px">
+          בכוונה מדדים בודדים בלבד — לא טבלת הוצאות. המספרים נשמרים במכשיר.
+        </p>
+        <div class="form-grid">
+          <div class="form-field"><label for="fin-budget">תקציב פנוי החודש (₪)</label><input type="number" id="fin-budget" value="${f.budgetFree != null ? escAttr(f.budgetFree) : ""}" placeholder="למשל 2500"></div>
+          <div class="form-field"><label for="fin-goal">התקדמות ליעד חיסכון (%)</label><input type="number" id="fin-goal" min="0" max="100" value="${f.savingsGoalPct != null ? escAttr(f.savingsGoalPct) : ""}" placeholder="0–100"></div>
+        </div>
+        <div class="form-field">
+          <label for="fin-decisions">החלטות שדורשות את שניכם (שורה לכל החלטה)</label>
+          <textarea id="fin-decisions" style="min-height:90px">${esc((f.openDecisions || []).join("\n"))}</textarea>
+        </div>
+        <div class="field-error" id="formError" hidden></div>
+        <div class="form-actions">
+          <div></div>
+          <div class="form-actions-right">
+            <button type="button" class="btn-secondary" id="cancelFormBtn">ביטול</button>
+            <button type="submit" class="btn-primary">שמירה</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  `);
+
+  document.getElementById("modalCloseBtn").addEventListener("click", closeModal);
+  document.getElementById("cancelFormBtn").addEventListener("click", closeModal);
+  document.getElementById("financeForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const b = document.getElementById("fin-budget").value;
+    const g = document.getElementById("fin-goal").value;
+    const decisions = document.getElementById("fin-decisions").value
+      .split("\n").map((s) => s.trim()).filter(Boolean);
+    await saveFinance({
+      budgetFree: b !== "" ? Number(b) : null,
+      savingsGoalPct: g !== "" ? Math.max(0, Math.min(100, Number(g))) : null,
+      openDecisions: decisions,
+    });
+    closeModal();
+    renderAll();
+    showToast("תמונת הפיננסים עודכנה");
+  });
 }
 
 // ---- טופסי הוספה/עריכה ----
