@@ -7,7 +7,14 @@
       "Bash(node scripts/make-icons.mjs)",
       "Bash(git symbolic-ref *)",
       "Bash(git add *)",
-      "Bash(git -c user.name=Liran -c user.email=liranmua@gmail.com commit -q -m ' *)"
+      "Bash(git -c user.name=Liran -c user.email=liranmua@gmail.com commit -q -m ' *)",
+      "Read(//c/Program Files/Git/mingw64/bin/**)",
+      "Read(//c/Program Files/Git/mingw64/libexec/git-core/**)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never timeout 20 git credential fill)",
+      "Bash(git fetch *)",
+      "Bash(git commit -q -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
