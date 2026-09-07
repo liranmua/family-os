@@ -14,7 +14,9 @@
       "Bash(GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never timeout 20 git credential fill)",
       "Bash(git fetch *)",
       "Bash(git commit -q -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:liranmua.github.io)"
     ]
   }
 }
