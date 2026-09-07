@@ -80,6 +80,13 @@ Google Tasks/Reminders כבר עובד טוב לתזכורות יומיומיו�
 
 מסמך המסירה המלא לסוכן הקוד: `Family_OS_Phase2_Handoff.md` (בתיקייה הזו).
 
+**התקדמות שלב 2 (2026-09-07, צעד 1 מתוך כמה):** בוצע ואומת החיבור הבסיסי בלבד —
+- Firestore הוקם בפרויקט `family-os-poc`: מסד `(default)`, מצב **Native**, location **me-west1** (תל אביב, בחירה קבועה של לירן). ה-Firestore API הופעל ידנית ע"י לירן דרך ה-console.
+- `FAMILY_ID` הקבוע בקוד: `fam_fd8a2e611ce12ff0e8bce649` (ב-`app/js/firebase.js`). Security Rules (`firestore.rules`, נפרס דרך `firebase deploy`): גישה רק ל-`families/<FAMILY_ID>/**`, כל השאר `permission-denied` (אומת).
+- `firebase` CLI במחשב של לירן מחובר כ-liranmua@gmail.com ועובד (כולל `firestore:databases:*` ו-`deploy --only firestore:rules`). קבצי הקונפיג: `.firebaserc`, `firebase.json`, `firestore.rules` בשורש ה-repo.
+- `app/js/sync-check.js` — כרטיס "בדיקת סנכרון" זמני בכותרת: כתיבה+קריאה של רשומה אחת (`_healthcheck/ping`) דרך `onSnapshot`. אומת בבדיקה מקומית: עדכון מלקוח שני מופיע חי בלי רענון. **עדיין לא נבדק על שני מכשירים אמיתיים (לירן + מורן)** — זה ה-gate לפני הצעד הבא.
+- **טרם בוצע**: הרפקטור של שכבת הנתונים (החלפת `app/js/db.js` ה-IndexedDB הידני ב-Firestore SDK, ישות-ישות), מיגרציה חד-פעמית עם לוגיקת הבטיחות, הסרת `sync-check.js`.
+
 **תוכנית מוסכמת, שלושה שלבים לפי קושי (לא לפי סדר החזון המקורי):**
 
 1. **שלב 1 — Prototype PWA מקומי**: סוכן קוד (Claude Code / Cursor) בונה את הממשק הראשי — משימות, רשימת קניות, פרויקטים, **התראות מקומיות בלבד** (in-app, לא פוש משרת). **בלי ענן, בלי חשבונות גוגל בשלב הזה בכלל.** נקודת ייחוס לעיצוב/UX: `family_hub_dashboard.html` הקיים — לא לבנות מאפס, להתפתח ממנו.
