@@ -10,3 +10,8 @@ npm-debug.log*
 # Local scratch
 scratch/
 *.local
+
+# Firebase CLI cache
+.firebase/
+firebase-debug.log
+firestore-debug.log

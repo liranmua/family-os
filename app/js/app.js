@@ -7,6 +7,7 @@ import {
 } from "./render.js";
 import { openItemForm } from "./forms.js";
 import { initNotifications, requestPermission } from "./notifications.js";
+import { initSyncCheck } from "./sync-check.js";
 
 let swRegistration = null;
 
@@ -137,6 +138,14 @@ async function main() {
   updateStorageLine();
 
   await initNotifications(reg || (await navigator.serviceWorker?.ready.catch(() => null)));
+
+  // שלב 2 — צעד ראשון: בדיקת חיבור Firestore (עדיין לא מחליף את שכבת הנתונים).
+  try {
+    initSyncCheck();
+  } catch (e) {
+    const s = document.getElementById("syncStatus");
+    if (s) s.textContent = "Firestore: לא נטען — " + (e && e.message ? e.message : e);
+  }
 }
 
 main();

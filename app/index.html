@@ -15,10 +15,12 @@
   <header>
     <div>
       <h1>🏠 Family OS</h1>
-      <div class="sub">שלב 1 · אפליקציה מקומית — הנתונים נשמרים במכשיר הזה בלבד</div>
       <div class="sub" id="storageLine">טוען…</div>
+      <div class="sub" id="syncStatus">Firestore: מתחבר…</div>
+      <div class="sub" id="syncLast" hidden></div>
     </div>
     <div class="header-actions">
+      <button class="hbtn" id="syncPingBtn">🔄 בדיקת סנכרון</button>
       <button class="hbtn" id="installBtn" hidden>📲 התקן אפליקציה</button>
       <button class="hbtn" id="resetBtn">♻️ אפס הכל</button>
     </div>
