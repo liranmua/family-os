@@ -30,7 +30,14 @@
       "Bash(node -e \"console.log\\('fam_' + require\\('crypto'\\).randomBytes\\(12\\).toString\\('hex'\\)\\)\")",
       "Bash(firebase deploy *)",
       "Bash(firebase firestore:databases:get \"\\(default\\)\" --project family-os-poc)",
-      "Bash(curl -s \"https://api.github.com/repos/liranmua/family-os/actions/runs?per_page=1&branch=main\")"
+      "Bash(curl -s \"https://api.github.com/repos/liranmua/family-os/actions/runs?per_page=1&branch=main\")",
+      "Bash(firebase firestore:delete \"families/test_p2a\" --recursive --force --project family-os-poc)",
+      "Bash(firebase firestore:delete \"families/fam_fd8a2e611ce12ff0e8bce649/_healthcheck\" --recursive --force --project family-os-poc)",
+      "Bash(node -e ' *)",
+      "Bash(firebase firestore:documents:list \"families/fam_fd8a2e611ce12ff0e8bce649/_meta\" --project family-os-poc)",
+      "Bash(firebase firestore:delete \"families/fam_fd8a2e611ce12ff0e8bce649\" --recursive --force --project family-os-poc)",
+      "Bash(firebase firestore:delete \"families/test_p2b\" --recursive --force --project family-os-poc)",
+      "Bash(firebase firestore:delete \"families/test_p2c\" --recursive --force --project family-os-poc)"
     ]
   }
 }

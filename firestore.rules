@@ -1,16 +1,23 @@
 rules_version = '2';
 
 // Family OS — שלב 2. אין authentication (זה שלב 3).
-// הכלל היחיד: גישה מותרת רק לנתיב המשפחתי הקבוע, וחסומה בכל מקום אחר.
+// גישה מותרת רק לנתיב המשפחתי הקבוע, וחסומה בכל מקום אחר.
 // זה מצמצם את משטח החשיפה לנתיב אחד לא-מנוחש — לא הגנה ברמת משתמש.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // הנתיב המשפחתי האמיתי.
     match /families/fam_fd8a2e611ce12ff0e8bce649/{document=**} {
       allow read, write: if true;
     }
 
+    // מרחב חול לבדיקות בלבד (?fam=test_...). מבודד מהנתיב האמיתי.
+    match /families/{fam}/{document=**} {
+      allow read, write: if fam.matches('test_[a-zA-Z0-9_-]+');
+    }
+
+    // כל השאר חסום.
     match /{document=**} {
       allow read, write: if false;
     }

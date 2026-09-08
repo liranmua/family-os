@@ -69,13 +69,13 @@ export function buildSeed() {
       { id: "ROU-003", name: "השקיית צמחים", category: "תחזוקת הבית", assignee: "לירן", active: true, notes: "רק בקיץ" },
     ],
     routineCompletions: [
-      { routineId: "ROU-001", date: plusDays(-2), done: true, by: "מורן" },
-      { routineId: "ROU-001", date: plusDays(-1), done: true, by: "לירן" },
-      { routineId: "ROU-002", date: plusDays(-1), done: true, by: "לירן" },
+      { id: "ROU-001__" + plusDays(-2), routineId: "ROU-001", date: plusDays(-2), done: true, by: "מורן" },
+      { id: "ROU-001__" + plusDays(-1), routineId: "ROU-001", date: plusDays(-1), done: true, by: "לירן" },
+      { id: "ROU-002__" + plusDays(-1), routineId: "ROU-002", date: plusDays(-1), done: true, by: "לירן" },
     ],
     shopping: [
-      { name: "חלב", category: "אוכל", qty: "2", status: "חסר", store: "סופר" },
-      { name: "נייר טואלט", category: "טואלטיקה", qty: "1", status: "חסר", store: "פארם" },
+      { id: "SHP-001", name: "חלב", category: "אוכל", qty: "2", status: "חסר", store: "סופר" },
+      { id: "SHP-002", name: "נייר טואלט", category: "טואלטיקה", qty: "1", status: "חסר", store: "פארם" },
     ],
     finance: {
       budgetFree: 2400,

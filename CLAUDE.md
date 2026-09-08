@@ -80,12 +80,24 @@ Google Tasks/Reminders כבר עובד טוב לתזכורות יומיומיו�
 
 מסמך המסירה המלא לסוכן הקוד: `Family_OS_Phase2_Handoff.md` (בתיקייה הזו).
 
-**התקדמות שלב 2 (2026-09-07, צעד 1 מתוך כמה):** בוצע ואומת החיבור הבסיסי בלבד —
-- Firestore הוקם בפרויקט `family-os-poc`: מסד `(default)`, מצב **Native**, location **me-west1** (תל אביב, בחירה קבועה של לירן). ה-Firestore API הופעל ידנית ע"י לירן דרך ה-console.
-- `FAMILY_ID` הקבוע בקוד: `fam_fd8a2e611ce12ff0e8bce649` (ב-`app/js/firebase.js`). Security Rules (`firestore.rules`, נפרס דרך `firebase deploy`): גישה רק ל-`families/<FAMILY_ID>/**`, כל השאר `permission-denied` (אומת).
-- `firebase` CLI במחשב של לירן מחובר כ-liranmua@gmail.com ועובד (כולל `firestore:databases:*` ו-`deploy --only firestore:rules`). קבצי הקונפיג: `.firebaserc`, `firebase.json`, `firestore.rules` בשורש ה-repo.
-- `app/js/sync-check.js` — כרטיס "בדיקת סנכרון" זמני בכותרת: כתיבה+קריאה של רשומה אחת (`_healthcheck/ping`) דרך `onSnapshot`. אומת בבדיקה מקומית: עדכון מלקוח שני מופיע חי בלי רענון. **עדיין לא נבדק על שני מכשירים אמיתיים (לירן + מורן)** — זה ה-gate לפני הצעד הבא.
-- **טרם בוצע**: הרפקטור של שכבת הנתונים (החלפת `app/js/db.js` ה-IndexedDB הידני ב-Firestore SDK, ישות-ישות), מיגרציה חד-פעמית עם לוגיקת הבטיחות, הסרת `sync-check.js`.
+**התקדמות שלב 2:**
+
+*צעד 1 (2026-09-07) — חיבור בסיסי, אומת גם על שני מכשירים אמיתיים:*
+- Firestore בפרויקט `family-os-poc`: מסד `(default)`, מצב **Native**, location **me-west1**. ה-API הופעל ידנית ע"י לירן.
+- `FAMILY_ID` קבוע בקוד: `fam_fd8a2e611ce12ff0e8bce649` (`app/js/firebase.js`), עם override `?fam=test_...` לבדיקות בלבד (רק prefix `test_`, מבודד בכללי האבטחה).
+- `firestore.rules` (נפרס דרך `firebase deploy --only firestore:rules`): גישה מלאה ל-`families/fam_fd8a2e611ce12ff0e8bce649/**`; sandbox ל-`families/test_*/**`; כל השאר `permission-denied`.
+- `firebase` CLI במחשב של לירן מחובר כ-liranmua@gmail.com ועובד. קונפיג: `.firebaserc`, `firebase.json`, `firestore.rules` בשורש ה-repo.
+- `sync-check.js` (הוסר בצעד 2) — שימש להוכחת החיבור.
+
+*צעד 2 (2026-09-08) — הרפקטור המלא של שכבת הנתונים, בוצע ואומת מקומית מול Firestore אמיתי (sandbox), טרם נפרס:*
+- `app/js/cloud.js` — שכבת הנתונים מול Firestore: `onSnapshot` per-collection (זמן אמת, בלי polling), `writeDoc`/`removeDoc`/`writeMeta`, `runMigration` טרנזקציוני, `clearCollection`/`bulkWrite` ל"אפס הכל".
+- `app/js/state.js` שוכתב: Firestore הוא מקור האמת. `db.js` (IndexedDB) נשאר **רק** כמקור למיגרציה + גיבוי מקומי + meta מקומי-למכשיר (`notifiedIds`, `notifPermissionAsked` — לא מסתנכרנים).
+- מבנה ב-Firestore: `families/<FID>/{tasks,routines,routineCompletions,projects,shopping,updatesLog}/{docId}` + `families/<FID>/meta/finance` + מרקר `families/<FID>/_meta/init`.
+- ids: routineCompletions עברו ל-id מורכב `<routineId>__<date>` (אידמפוטנטי); shopping ל-`SHP-###`. seed.js עודכן בהתאם.
+- **מיגרציה חד-פעמית עם בטיחות** (`runMigration`): טרנזקציה על `_meta/init` — אם `done:true` כבר קיים → לא מעלה כלום (מכשיר אחר כבר סנכרן); אחרת → מעלה את כל הנתונים המקומיים ומסמן. אומת: מכשיר שני עם נתונים מקומיים שונים מקבל `already-initialized` ולא דורס.
+- אומת מקומית מקצה לקצה (sandbox `test_p2*`): מיגרציה, CRUD לכל 6 הישויות + finance, סנכרון זמן-אמת בין 2 לקוחות (הוספה/עריכה/מחיקה), כתיבה אופליין → תור → סנכרון בהתחבר, persistence בטעינה מחדש, כללי אבטחה.
+- **גוצ'ה שקרתה בבנייה**: preview מקומי שנפתח בלי `?fam` הריץ מיגרציה על הנתיב האמיתי והעלה אליו נתוני seed. תוקן — הנתיב האמיתי `families/fam_fd8a2e611ce12ff0e8bce649` **נמחק לגמרי** (`firebase firestore:delete --recursive`) והוא ריק כרגע, מוכן למיגרציה נקייה מהמכשיר של לירן.
+- **טרם בוצע**: פריסה (`git push` → Pages), ו**קריטי** — לירן חייב לפתוח את הגרסה החדשה ראשון, מהמכשיר עם נתוני שלב 1 האמיתיים שלו, לפני שמורן פותחת. אחרי אימות על 2 מכשירים → שלב 3.
 
 **תוכנית מוסכמת, שלושה שלבים לפי קושי (לא לפי סדר החזון המקורי):**
 

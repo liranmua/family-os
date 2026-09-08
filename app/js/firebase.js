@@ -24,7 +24,19 @@ const firebaseConfig = {
 };
 
 // נתיב משפחתי קבוע. שני המכשירים (לירן + מורן) משתמשים באותו הערך.
-export const FAMILY_ID = "fam_fd8a2e611ce12ff0e8bce649";
+// אפשר לעקוף עם ?fam=... לבדיקות בלבד (לא בשימוש רגיל) — כדי לא לגעת בנתיב האמיתי.
+const DEFAULT_FAMILY_ID = "fam_fd8a2e611ce12ff0e8bce649";
+function resolveFamilyId() {
+  try {
+    const q = new URLSearchParams(location.search).get("fam");
+    if (q && q !== DEFAULT_FAMILY_ID && /^test_[a-zA-Z0-9_-]{1,50}$/.test(q)) {
+      console.warn("Family OS: משתמש בנתיב בדיקה", q, "(לא הנתונים האמיתיים)");
+      return q;
+    }
+  } catch (_) {}
+  return DEFAULT_FAMILY_ID;
+}
+export const FAMILY_ID = resolveFamilyId();
 
 export const app = initializeApp(firebaseConfig);
 

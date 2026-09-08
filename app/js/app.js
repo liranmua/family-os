@@ -1,13 +1,13 @@
 // Family OS — נקודת כניסה: רישום Service Worker, טעינת state, חיווט UI.
 
-import { loadState, resetAll, upsert, state } from "./state.js";
+import { loadState, resetAll, upsert, state, setChangeHandler, setSyncHandler } from "./state.js";
 import { CATEGORY_LIST, todayStr } from "./constants.js";
 import {
-  renderAll, setCategoryFilter, setRoutineToggleHandler, renderRoutines, renderKpis,
+  renderAll, setCategoryFilter, setRoutineToggleHandler,
 } from "./render.js";
 import { openItemForm } from "./forms.js";
 import { initNotifications, requestPermission } from "./notifications.js";
-import { initSyncCheck } from "./sync-check.js";
+import { deviceLabel } from "./cloud.js";
 
 let swRegistration = null;
 
@@ -22,28 +22,23 @@ async function registerSW() {
   }
 }
 
-function updateStorageLine() {
+function updateSyncLine() {
   const el = document.getElementById("storageLine");
-  const n =
-    state.tasks.length + state.routines.length + state.projects.length + state.shopping.length;
-  el.textContent = `${n} פריטים נשמרים ב-IndexedDB במכשיר הזה`;
+  if (!el) return;
+  if (!state.sync.ready) { el.textContent = "טוען מהענן…"; return; }
+  const n = state.tasks.length + state.routines.length + state.projects.length + state.shopping.length;
+  if (state.sync.pending) el.textContent = `${n} פריטים · שומר…`;
+  else if (state.sync.fromCache) el.textContent = `${n} פריטים · מקומי (אין רשת) — יסתנכרן כשתחזור`;
+  else el.textContent = `${n} פריטים · מסונכרן בין המכשירים ✓`;
 }
 
 // ---- שגרות: סימון "בוצע היום" ----
 async function toggleRoutineToday(routineId) {
   const today = todayStr();
-  let entry = state.routineCompletions.find((c) => c.routineId === routineId && c.date === today);
-  if (!entry) {
-    entry = { routineId, date: today, done: true, by: "לירן" };
-    await upsert("routineCompletion", entry);
-  } else {
-    entry.done = !entry.done;
-    entry.by = entry.done ? "לירן" : null;
-    await upsert("routineCompletion", entry);
-  }
-  renderRoutines(toggleRoutineToday);
-  renderKpis();
-  updateStorageLine();
+  const id = `${routineId}__${today}`;
+  const existing = state.routineCompletions.find((c) => c.id === id);
+  const done = !(existing && existing.done);
+  await upsert("routineCompletion", { id, routineId, date: today, done, by: done ? deviceLabel() : null });
 }
 
 // ---- טאבים ----
@@ -64,10 +59,12 @@ function wireTabs() {
 function wireFilters() {
   const cats = [...new Set(state.tasks.map((t) => t.category))].filter(Boolean);
   const all = [...new Set([...CATEGORY_LIST, ...cats])];
+  const sel = document.getElementById("catFilter");
+  const cur = sel ? sel.value : "";
   document.getElementById("filters").innerHTML = `
     <select id="catFilter" aria-label="סינון לפי תחום">
       <option value="">כל התחומים</option>
-      ${all.map((c) => `<option value="${c}">${c}</option>`).join("")}
+      ${all.map((c) => `<option value="${c}" ${c === cur ? "selected" : ""}>${c}</option>`).join("")}
     </select>`;
   document.getElementById("catFilter").addEventListener("change", (e) => {
     setCategoryFilter(e.target.value);
@@ -87,17 +84,17 @@ function wireButtons() {
     const btn = document.getElementById("resetBtn");
     if (btn.dataset.armed !== "1") {
       btn.dataset.armed = "1";
-      btn.textContent = "לאשר איפוס?";
-      setTimeout(() => { btn.dataset.armed = "0"; btn.textContent = "♻️ אפס הכל"; }, 3000);
+      btn.textContent = "לאשר? (מוחק גם אצל מורן)";
+      setTimeout(() => { btn.dataset.armed = "0"; btn.textContent = "♻️ אפס הכל"; }, 4000);
       return;
     }
     btn.dataset.armed = "0";
+    btn.textContent = "מאפס…";
+    await resetAll();
     btn.textContent = "♻️ אפס הכל";
-    await resetAll({ reseed: true });
     setCategoryFilter("");
     wireFilters();
     renderAll();
-    updateStorageLine();
   });
 
   // התקנת PWA
@@ -125,27 +122,52 @@ function wireOverlay() {
   });
 }
 
+function toast(msg, ms = 3500) {
+  const el = document.getElementById("toast");
+  if (!el) return;
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { el.hidden = true; }, ms);
+}
+
+function announceMigration() {
+  const m = state.sync.migration;
+  if (!m) return;
+  if (m.migrated) {
+    const n = Object.values(m.counts || {}).reduce((a, b) => a + b, 0);
+    toast(`סנכרון בין המכשירים הופעל ✓ — הועלו ${n} פריטים לענן`, 6000);
+  } else if (m.reason === "already-initialized") {
+    toast("מחובר לנתונים המשותפים ✓", 3000);
+  }
+}
+
+let _lastCats = "";
+function onStateChange() {
+  renderAll();
+  updateSyncLine();
+  // רענון רשימת הפילטר אם נוספו/נעלמו תחומים
+  const cats = [...new Set(state.tasks.map((t) => t.category))].filter(Boolean).sort().join("|");
+  if (cats !== _lastCats) { _lastCats = cats; wireFilters(); }
+}
+
 async function main() {
   const reg = await registerSW();
-  await loadState();
 
+  setChangeHandler(onStateChange);
+  setSyncHandler(updateSyncLine);
   setRoutineToggleHandler(toggleRoutineToday);
+
   wireTabs();
-  wireFilters();
   wireButtons();
   wireOverlay();
-  renderAll();
-  updateStorageLine();
+
+  await loadState();
+  wireFilters();
+  onStateChange();
+  announceMigration();
 
   await initNotifications(reg || (await navigator.serviceWorker?.ready.catch(() => null)));
-
-  // שלב 2 — צעד ראשון: בדיקת חיבור Firestore (עדיין לא מחליף את שכבת הנתונים).
-  try {
-    initSyncCheck();
-  } catch (e) {
-    const s = document.getElementById("syncStatus");
-    if (s) s.textContent = "Firestore: לא נטען — " + (e && e.message ? e.message : e);
-  }
 }
 
 main();
