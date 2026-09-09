@@ -8,6 +8,7 @@ import {
 import { openItemForm } from "./forms.js";
 import { initNotifications, requestPermission } from "./notifications.js";
 import { deviceLabel } from "./cloud.js";
+import { initAuth, signIn, signOutUser, currentUserName } from "./auth.js";
 
 let swRegistration = null;
 
@@ -38,7 +39,44 @@ async function toggleRoutineToday(routineId) {
   const id = `${routineId}__${today}`;
   const existing = state.routineCompletions.find((c) => c.id === id);
   const done = !(existing && existing.done);
-  await upsert("routineCompletion", { id, routineId, date: today, done, by: done ? deviceLabel() : null });
+  await upsert("routineCompletion", { id, routineId, date: today, done, by: done ? currentUserName(deviceLabel()) : null });
+}
+
+// ---- Google Sign-In (שלב 3, צעד 1 — זיהוי בלבד, לא חוסם נתונים) ----
+function renderAuth(user) {
+  const signInBtn = document.getElementById("signInBtn");
+  const box = document.getElementById("authUser");
+  if (user) {
+    signInBtn.hidden = true;
+    box.hidden = false;
+    document.getElementById("authName").textContent = user.displayName || user.email || "מחובר";
+    const av = document.getElementById("authAvatar");
+    if (user.photoURL) { av.src = user.photoURL; av.hidden = false; } else { av.hidden = true; }
+  } else {
+    signInBtn.hidden = false;
+    box.hidden = true;
+  }
+}
+
+function wireAuth() {
+  document.getElementById("signInBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("signInBtn");
+    btn.disabled = true;
+    const prev = btn.textContent;
+    btn.textContent = "מתחבר…";
+    const res = await signIn();
+    btn.disabled = false;
+    btn.textContent = prev;
+    if (!res.ok && !res.silent) {
+      const map = {
+        "auth/unauthorized-domain": "הדומיין של האתר עדיין לא מאושר ב-Firebase Auth — צריך להוסיף אותו ב-Console.",
+        "auth/operation-not-allowed": "Google Sign-In עדיין לא הופעל ב-Firebase Auth (Console → Authentication).",
+        "auth/configuration-not-found": "Firebase Authentication עדיין לא הופעל בפרויקט (Console → Authentication → Get started).",
+      };
+      toast(map[res.code] || ("התחברות נכשלה: " + res.code), 6000);
+    }
+  });
+  document.getElementById("signOutBtn").addEventListener("click", () => signOutUser());
 }
 
 // ---- טאבים ----
@@ -161,6 +199,8 @@ async function main() {
   wireTabs();
   wireButtons();
   wireOverlay();
+  wireAuth();
+  initAuth(renderAuth).catch((e) => console.warn("initAuth failed:", e));
 
   await loadState();
   wireFilters();

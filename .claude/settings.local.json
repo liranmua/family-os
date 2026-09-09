@@ -37,7 +37,8 @@
       "Bash(firebase firestore:documents:list \"families/fam_fd8a2e611ce12ff0e8bce649/_meta\" --project family-os-poc)",
       "Bash(firebase firestore:delete \"families/fam_fd8a2e611ce12ff0e8bce649\" --recursive --force --project family-os-poc)",
       "Bash(firebase firestore:delete \"families/test_p2b\" --recursive --force --project family-os-poc)",
-      "Bash(firebase firestore:delete \"families/test_p2c\" --recursive --force --project family-os-poc)"
+      "Bash(firebase firestore:delete \"families/test_p2c\" --recursive --force --project family-os-poc)",
+      "Bash(firebase firestore:delete \"families/test_p3\" --recursive --force --project family-os-poc)"
     ]
   }
 }

@@ -1,9 +1,9 @@
-// Family OS — אתחול Firebase + Firestore (שלב 2).
+// Family OS — אתחול Firebase (Firestore + Auth).
 //
-// מודל גישה: אין authentication (זה שלב 3). שני המכשירים מצביעים על נתיב משפחתי
-// קבוע ומוטבע בקוד. firebaseConfig הוא מזהה ציבורי של אפליקציית קליינט — מותר
-// שיהיה בקוד. ה-FAMILY_ID אקראי כדי להוסיף עמימות, אבל הוא לא סוד אמיתי:
-// Security Rules ב-Firestore מגבילות גישה לנתיב הזה בלבד, לא ברמת משתמש.
+// שלב 3: מוסיפים Google Sign-In. בצעד הראשון ה-Sign-In הוא זיהוי בלבד וה-Security
+// Rules עדיין פתוחות לנתיב המשפחתי הקבוע (עובד במקביל). ההידוק לרשימת מיילים סגורה
+// קורה רק אחרי ששני הצדדים התחברו לפחות פעם אחת. firebaseConfig הוא מזהה ציבורי
+// של אפליקציית קליינט — מותר שיהיה בקוד.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {

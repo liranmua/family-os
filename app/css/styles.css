@@ -50,6 +50,14 @@ header .sub { font-size: 12.5px; opacity: .75; margin-top: 3px; }
 }
 .hbtn:hover { background: rgba(255,255,255,.22); }
 .hbtn[hidden] { display: none; }
+.hbtn-sm { padding: 4px 9px; font-size: 11.5px; }
+
+.auth-box { display: flex; align-items: center; }
+.auth-user { display: flex; align-items: center; gap: 8px; }
+.auth-user[hidden] { display: none; }
+.auth-user img { width: 24px; height: 24px; border-radius: 50%; }
+.auth-user img[hidden] { display: none; }
+#authName { color: #fff; font-size: 12.5px; font-weight: 600; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .notice {
   background: #FDF6E3; border: 1px solid #F0E4C0; color: #7A5B00;
