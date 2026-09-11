@@ -36,38 +36,66 @@
     <button id="enableNotifBtn">אפשר התראות</button>
   </div>
 
-  <div class="kpi-row" id="kpiRow"></div>
-
-  <div class="finance-card" id="financeCard" hidden></div>
-
-  <div class="tabs">
-    <div class="tab active" data-tab="projects" tabindex="0">🧩 פרויקטים</div>
-    <div class="tab" data-tab="tasks" tabindex="0">✅ משימות</div>
-    <div class="tab" data-tab="routines" tabindex="0">🔁 שגרות יומיות</div>
-    <div class="tab" data-tab="shopping" tabindex="0">🛒 קניות</div>
-    <div class="tab" data-tab="people" tabindex="0">👪 בני המשפחה</div>
+  <!-- ===== HUB (מסך ראשי) ===== -->
+  <div class="screen" id="screen-hub">
+    <div class="glance-card" id="todayGlance"></div>
+    <div class="tiles" id="hubTiles"></div>
+    <div class="hub-footer"><button class="link-btn" id="openSettingsBtn">⚙️ הגדרות · בני המשפחה</button></div>
   </div>
 
-  <div class="filters" id="filters"></div>
-
-  <div class="section active" id="sec-projects">
-    <div class="cards" id="projectsCards"></div>
-  </div>
-  <div class="section" id="sec-tasks">
+  <!-- ===== משימות ===== -->
+  <div class="screen" id="screen-tasks" hidden>
+    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>✅ משימות</h2></div>
+    <div class="filters" id="filtersTasks"></div>
     <div class="toolbar-row"><button class="btn-primary" id="addTaskBtn">+ משימה חדשה</button></div>
     <div class="table-wrap"><table id="tasksTable"></table></div>
   </div>
-  <div class="section" id="sec-routines">
+
+  <!-- ===== שגרות ===== -->
+  <div class="screen" id="screen-routines" hidden>
+    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>🔁 שגרות יומיות</h2></div>
+    <div class="filters" id="filtersRoutines"></div>
     <div class="toolbar-row"><button class="btn-primary" id="addRoutineBtn">+ שגרה חדשה</button></div>
     <div class="routines-grid" id="routinesGrid"></div>
   </div>
-  <div class="section" id="sec-shopping">
+
+  <!-- ===== קניות ===== -->
+  <div class="screen" id="screen-shopping" hidden>
+    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>🛒 רשימת קניות</h2></div>
     <div class="toolbar-row"><button class="btn-primary" id="addShopBtn">+ פריט קניות</button></div>
     <div class="table-wrap"><table id="shopTable"></table></div>
   </div>
-  <div class="section" id="sec-people"><div class="people-grid" id="peopleGrid"></div></div>
 
-  <p class="footer-note">Family OS · שלב 1 (Prototype PWA מקומי) · מתפתח מ-family_hub_dashboard.html</p>
+  <!-- ===== פיננסים ===== -->
+  <div class="screen" id="screen-finance" hidden>
+    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>💰 פיננסים</h2></div>
+    <div class="finance-card" id="financeCard"></div>
+  </div>
+
+  <!-- ===== פרויקטים ===== -->
+  <div class="screen" id="screen-projects" hidden>
+    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>🧩 פרויקטים</h2></div>
+    <div class="filters" id="filtersProjects"></div>
+    <div class="cards" id="projectsCards"></div>
+  </div>
+
+  <!-- ===== יומן (עדיין לא מחובר — נבנה בשלב הבא) ===== -->
+  <div class="screen" id="screen-calendar" hidden>
+    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>📅 יומן</h2></div>
+    <div class="log-empty">
+      חיבור אמיתי ליומן Google (קריאה בלבד) עדיין לא נבנה — זה השלב הבא בתור הבנייה.
+      אין כרגע נתונים אמיתיים להציג כאן.
+    </div>
+  </div>
+
+  <!-- ===== הגדרות ===== -->
+  <div class="screen" id="screen-settings" hidden>
+    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>⚙️ הגדרות</h2></div>
+    <h3 class="settings-sub">בני המשפחה</h3>
+    <div class="people-grid" id="peopleGrid"></div>
+  </div>
+
+  <p class="footer-note">Family OS · מתפתח מ-family_hub_dashboard.html</p>
 </div>
 
 <div class="modal-overlay" id="modalOverlay" hidden>

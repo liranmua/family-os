@@ -3,12 +3,15 @@
 import { loadState, resetAll, upsert, state, setChangeHandler, setSyncHandler } from "./state.js";
 import { CATEGORY_LIST, todayStr } from "./constants.js";
 import {
-  renderAll, setCategoryFilter, setRoutineToggleHandler,
+  renderAll, setCategoryFilter, getCategoryFilter, setRoutineToggleHandler,
 } from "./render.js";
 import { openItemForm } from "./forms.js";
 import { initNotifications, requestPermission } from "./notifications.js";
 import { deviceLabel } from "./cloud.js";
 import { initAuth, signIn, signOutUser, currentUserName } from "./auth.js";
+import { showScreen } from "./nav.js";
+
+const FILTER_CONTAINERS = ["filtersTasks", "filtersRoutines", "filtersProjects"];
 
 let swRegistration = null;
 
@@ -79,34 +82,38 @@ function wireAuth() {
   document.getElementById("signOutBtn").addEventListener("click", () => signOutUser());
 }
 
-// ---- טאבים ----
-function wireTabs() {
-  document.querySelectorAll(".tab").forEach((tab) => {
-    const activate = () => {
-      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-      document.querySelectorAll(".section").forEach((s) => s.classList.remove("active"));
-      tab.classList.add("active");
-      document.getElementById("sec-" + tab.dataset.tab).classList.add("active");
-    };
-    tab.addEventListener("click", activate);
-    tab.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); } });
-  });
+// ---- ניווט: Hub + חזרה + הגדרות ----
+function wireNav() {
+  document.querySelectorAll("[data-back]").forEach((b) => b.addEventListener("click", () => showScreen("hub")));
+  const settingsBtn = document.getElementById("openSettingsBtn");
+  if (settingsBtn) settingsBtn.addEventListener("click", () => showScreen("settings"));
 }
 
-// ---- פילטר תחום ----
+// ---- פילטר תחום (מופיע בכמה אזורים, כולם על אותו מסנן משותף) ----
 function wireFilters() {
   const cats = [...new Set(state.tasks.map((t) => t.category))].filter(Boolean);
   const all = [...new Set([...CATEGORY_LIST, ...cats])];
-  const sel = document.getElementById("catFilter");
-  const cur = sel ? sel.value : "";
-  document.getElementById("filters").innerHTML = `
-    <select id="catFilter" aria-label="סינון לפי תחום">
-      <option value="">כל התחומים</option>
-      ${all.map((c) => `<option value="${c}" ${c === cur ? "selected" : ""}>${c}</option>`).join("")}
-    </select>`;
-  document.getElementById("catFilter").addEventListener("change", (e) => {
-    setCategoryFilter(e.target.value);
-    renderAll();
+  const cur = getCategoryFilter();
+  FILTER_CONTAINERS.forEach((id) => {
+    const container = document.getElementById(id);
+    if (!container) return;
+    container.innerHTML = `
+      <select aria-label="סינון לפי תחום">
+        <option value="">כל התחומים</option>
+        ${all.map((c) => `<option value="${c}" ${c === cur ? "selected" : ""}>${c}</option>`).join("")}
+      </select>`;
+    container.querySelector("select").addEventListener("change", (e) => {
+      setCategoryFilter(e.target.value);
+      renderAll();
+      syncFilterSelects();
+    });
+  });
+}
+function syncFilterSelects() {
+  const cur = getCategoryFilter();
+  FILTER_CONTAINERS.forEach((id) => {
+    const sel = document.querySelector(`#${id} select`);
+    if (sel) sel.value = cur;
   });
 }
 
@@ -196,7 +203,7 @@ async function main() {
   setSyncHandler(updateSyncLine);
   setRoutineToggleHandler(toggleRoutineToday);
 
-  wireTabs();
+  wireNav();
   wireButtons();
   wireOverlay();
   wireAuth();

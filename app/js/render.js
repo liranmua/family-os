@@ -7,6 +7,7 @@ import {
   formatDateDisplay, todayStr, esc,
 } from "./constants.js";
 import { openItemForm, openTaskDetail, openUpdateForm, openFinanceForm } from "./forms.js";
+import { showScreen } from "./nav.js";
 
 let activeCategoryFilter = "";
 export function setCategoryFilter(v) { activeCategoryFilter = v; }
@@ -41,27 +42,65 @@ export function todaysCompletion(routineId) {
 
 // ---- KPIs ----
 
-function kpis() {
-  const openTasks = state.tasks.filter((t) => t.status !== "done").length;
-  const activeProjects = state.projects.filter((p) => p.status !== "done").length;
-  const shortShopping = state.shopping.filter((s) => s.status !== "במלאי").length;
+// ---- Hub (מסך ראשי): רצועת "היום" + רשת אזורים ----
+
+export function renderHub() {
+  const glanceEl = document.getElementById("todayGlance");
+  const tilesEl = document.getElementById("hubTiles");
+  if (!glanceEl || !tilesEl) return;
+
+  const today = todayStr();
+  const openTasks = state.tasks.filter((t) => t.status !== "done");
+  const overdue = openTasks.filter((t) => t.dueDate && t.dueDate < today);
+  const activeProjects = state.projects.filter((p) => p.status !== "done");
+  const shortShopping = state.shopping.filter((s) => s.status !== "במלאי");
   const activeRoutines = state.routines.filter((r) => r.active);
   const routinesDoneToday = activeRoutines.filter((r) => {
     const c = todaysCompletion(r.id);
     return c && c.done;
   }).length;
-  return [
-    { num: openTasks, lbl: "משימות פתוחות" },
-    { num: activeProjects, lbl: "פרויקטים פעילים" },
-    { num: `${routinesDoneToday}/${activeRoutines.length}`, lbl: "שגרות שבוצעו היום" },
-    { num: shortShopping, lbl: "פריטי קניות חסרים" },
-  ];
-}
+  const f = state.finance || {};
+  const budgetLbl = f.budgetFree != null ? `₪${Number(f.budgetFree).toLocaleString("he-IL")}` : "—";
+  const goalLbl = f.savingsGoalPct != null ? `${f.savingsGoalPct}%` : "—";
 
-export function renderKpis() {
-  document.getElementById("kpiRow").innerHTML = kpis()
-    .map((k) => `<div class="kpi"><div class="num">${esc(k.num)}</div><div class="lbl">${esc(k.lbl)}</div></div>`)
+  glanceEl.innerHTML = `
+    <div class="glance-title">היום</div>
+    <button class="glance-row" data-go="tasks">
+      <span class="gi">✅</span><span>${openTasks.length} משימות פתוחות</span>
+      ${overdue.length ? `<span class="pill pill-bad">${overdue.length} באיחור</span>` : ""}
+    </button>
+    <button class="glance-row" data-go="routines">
+      <span class="gi">🔁</span><span>שגרות היום</span>
+      <span class="pill ${activeRoutines.length && routinesDoneToday === activeRoutines.length ? "pill-ok" : "pill-warn"}">${routinesDoneToday}/${activeRoutines.length}</span>
+    </button>
+    <button class="glance-row" data-go="calendar">
+      <span class="gi">📅</span><span>יומן</span>
+      <span class="pill pill-mut">בקרוב</span>
+    </button>
+    <button class="glance-row" data-go="shopping">
+      <span class="gi">🛒</span><span>רשימת קניות</span>
+      <span class="pill pill-mut">${shortShopping.length} חסרים</span>
+    </button>`;
+
+  const tiles = [
+    { key: "tasks", cls: "tc-tasks", icon: "✅", name: "משימות", sub: `${openTasks.length} פתוחות${overdue.length ? ` · ${overdue.length} באיחור` : ""}` },
+    { key: "shopping", cls: "tc-shop", icon: "🛒", name: "קניות", sub: `${shortShopping.length} חסרים` },
+    { key: "calendar", cls: "tc-cal", icon: "📅", name: "יומן", sub: "בקרוב" },
+    { key: "finance", cls: "tc-fin", icon: "💰", name: "פיננסים", sub: `פנוי ${budgetLbl} · יעד ${goalLbl}` },
+    { key: "projects", cls: "tc-proj", icon: "🧩", name: "פרויקטים", sub: `${activeProjects.length} פעילים` },
+    { key: "routines", cls: "tc-routine", icon: "🔁", name: "שגרות", sub: `${activeRoutines.length} פעילות · ${routinesDoneToday}/${activeRoutines.length} היום` },
+  ];
+  tilesEl.innerHTML = tiles
+    .map((t) => `
+      <button class="tile ${t.cls}" data-go="${t.key}">
+        <div class="tile-name">${t.icon} ${esc(t.name)}</div>
+        <div class="tile-sub">${esc(t.sub)}</div>
+      </button>`)
     .join("");
+
+  [...glanceEl.querySelectorAll("[data-go]"), ...tilesEl.querySelectorAll("[data-go]")].forEach((el) =>
+    el.addEventListener("click", () => showScreen(el.dataset.go))
+  );
 }
 
 // ---- Projects ----
@@ -308,7 +347,7 @@ let _onRoutineToggle = () => {};
 export function setRoutineToggleHandler(fn) { _onRoutineToggle = fn; }
 
 export function renderAll() {
-  renderKpis();
+  renderHub();
   renderFinance();
   renderProjects();
   renderTasks();
