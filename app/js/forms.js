@@ -3,11 +3,12 @@
 
 import { state, upsert, remove, saveFinance } from "./state.js";
 import {
-  CATEGORY_LIST, ASSIGNABLE_NAMES, ALL_PEOPLE_NAMES, STATUS_LABEL, STATUS_ORDER,
+  CATEGORY_LIST, ASSIGNABLE_NAMES, ALL_PEOPLE_NAMES, STATUS_LABEL, STATUS_CLASS, STATUS_ORDER,
   TYPE_META, PRIORITY_OPTIONS, FREQUENCY_OPTIONS, SHOP_STATUS_OPTIONS, SHOP_CATEGORY_OPTIONS,
   optionList, formatDateDisplay, nextId, todayStr, esc, escAttr,
 } from "./constants.js";
 import { renderAll, projectProgress, subtaskProgress } from "./render.js";
+import { showScreen } from "./nav.js";
 
 const overlay = () => document.getElementById("modalOverlay");
 const modalEl = () => document.getElementById("modal");
@@ -43,7 +44,8 @@ export function openTaskDetail(taskId) {
 
   const metaItems = [
     ["תחום", t.category],
-    ["אחראי", t.owner],
+    ["מוביל", t.owner],
+    ["גם רלוונטי ל", t.alsoRelevantTo && t.alsoRelevantTo.length ? t.alsoRelevantTo.join(", ") : "—"],
     ["סוג משימה", `${type.icon} ${t.taskType}`],
     ["סטטוס", STATUS_LABEL[t.status]],
     ["תאריך יעד", dateVal],
@@ -240,6 +242,151 @@ export function openFinanceForm() {
   });
 }
 
+// ---- מסך פרויקט מלא (drill-in) ----
+
+let _openProjectId = null;
+
+export function openProjectDetail(projectId) {
+  _openProjectId = projectId;
+  showScreen("project-detail");
+  renderProjectDetailBody();
+}
+
+// נקרא מ-renderAll() כדי לרענן את מסך הפרויקט אם הוא פתוח (למשל אחרי סימון V על משימה)
+export function refreshProjectDetailIfOpen() {
+  if (_openProjectId && state.projects.some((p) => p.id === _openProjectId)) renderProjectDetailBody();
+}
+
+function renderProjectDetailBody() {
+  const p = state.projects.find((x) => x.id === _openProjectId);
+  if (!p) return;
+  const prog = projectProgress(p);
+  const linkedTasks = state.tasks.filter((t) => t.projectId === p.id);
+  const log = state.updatesLog.filter((u) => u.entityType === "project" && u.entityId === p.id);
+  const links = p.links || [];
+
+  document.getElementById("pdTitle").textContent = `🧩 ${p.name}`;
+  document.getElementById("projectDetailBody").innerHTML = `
+    <div class="toolbar-row" style="justify-content:space-between;align-items:center">
+      <span class="badge status-pill ${STATUS_CLASS[p.status]}">${STATUS_LABEL[p.status]}</span>
+      <button class="icon-edit-btn" id="pdEditBtn">✏️ עריכה</button>
+    </div>
+    <div class="modal-meta-grid" style="margin:14px 0">
+      <div class="meta-item"><div class="k">מוביל</div><div class="v">${esc(p.owner)}</div></div>
+      <div class="meta-item"><div class="k">תחום</div><div class="v">${esc(p.category)}</div></div>
+      <div class="meta-item"><div class="k">עדיפות</div><div class="v">${esc(p.priority)}</div></div>
+      ${p.target ? `<div class="meta-item"><div class="k">יעד</div><div class="v">${formatDateDisplay(p.target)}</div></div>` : ""}
+      ${p.budget != null && p.budget !== "" ? `<div class="meta-item"><div class="k">תקציב</div><div class="v">₪${esc(p.budget)}</div></div>` : ""}
+    </div>
+    <div class="progress-row">
+      <div class="progress-track"><div class="progress-fill" style="width:${prog.pct}%"></div></div>
+      <span class="progress-label">${prog.done}/${prog.total} משימות הושלמו · ${prog.pct}%</span>
+    </div>
+
+    <div class="modal-section">
+      <h4>משימות בפרויקט</h4>
+      ${
+        linkedTasks.length
+          ? `<div class="subtask-list" id="pdTaskList">${linkedTasks
+              .map(
+                (t) => `
+            <div class="subtask-item ${t.status === "done" ? "done" : ""}">
+              <input type="checkbox" data-task-id="${esc(t.id)}" ${t.status === "done" ? "checked" : ""} id="pdt-${esc(t.id)}">
+              <label for="pdt-${esc(t.id)}" style="flex:1;cursor:pointer">
+                <div class="stx-name">${esc(t.name)}</div>
+                <div class="stx-note">${esc(t.owner)} · ${STATUS_LABEL[t.status]}</div>
+              </label>
+              <button class="icon-edit-btn" data-open-task="${esc(t.id)}" aria-label="פתיחת המשימה">↗</button>
+            </div>`
+              )
+              .join("")}</div>`
+          : `<p style="font-size:13px;color:var(--text-secondary);font-style:italic">אין עדיין משימות מקושרות לפרויקט הזה</p>`
+      }
+    </div>
+
+    <div class="modal-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+        <h4 style="margin:0">קישורים</h4>
+        <button class="icon-edit-btn" id="pdAddLinkBtn">+ קישור</button>
+      </div>
+      <div id="pdLinkForm" hidden>
+        <div class="form-grid">
+          <div class="form-field"><label for="pd-link-title">כותרת</label><input type="text" id="pd-link-title" placeholder="למשל: לוח השראה"></div>
+          <div class="form-field"><label for="pd-link-url">כתובת</label><input type="text" id="pd-link-url" placeholder="https://..."></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button type="button" class="btn-secondary" id="pdLinkCancel">ביטול</button>
+          <button type="button" class="btn-primary" id="pdLinkSave">הוספה</button>
+        </div>
+      </div>
+      ${
+        links.length
+          ? `<div id="pdLinksList">${links
+              .map(
+                (l) => `
+            <div class="linkrow">
+              <a href="${escAttr(l.url)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(l.title || l.url)}</a>
+              <button class="icon-edit-btn" data-del-link="${esc(l.id)}" aria-label="הסרת קישור">✕</button>
+            </div>`
+              )
+              .join("")}</div>`
+          : `<div class="log-empty" id="pdNoLinks">אין עדיין קישורים</div>`
+      }
+    </div>
+
+    <div class="modal-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+        <h4 style="margin:0">לוג עדכונים</h4>
+        <button class="icon-edit-btn" id="pdAddUpdateBtn">+ עדכון</button>
+      </div>
+      ${
+        log.length
+          ? `<div class="log-list">${log
+              .map((l) => `<div class="log-entry">${esc(l.note)}<span class="log-meta">${esc(l.author)} · ${formatDateDisplay(l.date) || esc(l.date)}</span></div>`)
+              .join("")}</div>`
+          : `<div class="log-empty">אין עוד עדכונים לפרויקט הזה</div>`
+      }
+    </div>
+  `;
+
+  wireProjectDetailEvents(p);
+}
+
+function wireProjectDetailEvents(p) {
+  document.getElementById("pdEditBtn").addEventListener("click", () => openItemForm("project", p.id));
+  document.getElementById("pdAddUpdateBtn").addEventListener("click", () => openUpdateForm("project", p.id));
+
+  document.querySelectorAll("[data-open-task]").forEach((btn) =>
+    btn.addEventListener("click", () => openTaskDetail(btn.dataset.openTask))
+  );
+  document.querySelectorAll("#pdTaskList input[type=checkbox]").forEach((cb) =>
+    cb.addEventListener("change", async () => {
+      const t = state.tasks.find((x) => x.id === cb.dataset.taskId);
+      if (!t) return;
+      await upsert("task", { ...t, status: cb.checked ? "done" : "todo" });
+    })
+  );
+
+  const addBtn = document.getElementById("pdAddLinkBtn");
+  const linkForm = document.getElementById("pdLinkForm");
+  addBtn.addEventListener("click", () => { linkForm.hidden = false; addBtn.hidden = true; });
+  document.getElementById("pdLinkCancel").addEventListener("click", () => { linkForm.hidden = true; addBtn.hidden = false; });
+  document.getElementById("pdLinkSave").addEventListener("click", async () => {
+    const title = document.getElementById("pd-link-title").value.trim();
+    let url = document.getElementById("pd-link-url").value.trim();
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+    const links = [...(p.links || []), { id: nextId("LNK", (p.links || []).map((l) => l.id)), title: title || url, url }];
+    await upsert("project", { ...p, links });
+  });
+  document.querySelectorAll("[data-del-link]").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      const links = (p.links || []).filter((l) => l.id !== btn.dataset.delLink);
+      await upsert("project", { ...p, links });
+    })
+  );
+}
+
 // ---- טופסי הוספה/עריכה ----
 
 function subtaskRowHtml(id, name, notes) {
@@ -290,7 +437,7 @@ function taskFormBody(t) {
     </div>
     <div class="form-grid">
       <div class="form-field"><label for="f-category">תחום</label><select id="f-category">${optionList(CATEGORY_LIST, t.category)}</select></div>
-      <div class="form-field"><label for="f-owner">אחראי יחיד <span class="req-hint">*</span></label><select id="f-owner">${optionList(ASSIGNABLE_NAMES, t.owner || ASSIGNABLE_NAMES[0])}</select></div>
+      <div class="form-field"><label for="f-owner">מוביל <span class="req-hint">*</span></label><select id="f-owner">${optionList(ASSIGNABLE_NAMES, t.owner || ASSIGNABLE_NAMES[0])}</select></div>
       <div class="form-field"><label for="f-status">סטטוס</label><select id="f-status">${STATUS_ORDER.map((s) => `<option value="${s}" ${s === t.status ? "selected" : ""}>${STATUS_LABEL[s]}</option>`).join("")}</select></div>
       <div class="form-field"><label for="f-priority">עדיפות</label><select id="f-priority">${optionList(PRIORITY_OPTIONS, t.priority || "רגיל")}</select></div>
       <div class="form-field"><label for="f-frequency">תדירות</label><select id="f-frequency">${optionList(FREQUENCY_OPTIONS, t.frequency || "חד-פעמי")}</select></div>
@@ -298,6 +445,14 @@ function taskFormBody(t) {
       <div class="form-field"><label for="f-dueTime">שעה</label><input type="time" id="f-dueTime" value="${escAttr(t.dueTime || "")}"></div>
       <div class="form-field"><label for="f-relatedPerson">נוגע ל (לא חובה)</label><select id="f-relatedPerson"><option value="">—</option>${optionList(ALL_PEOPLE_NAMES, t.relatedPerson)}</select></div>
       <div class="form-field"><label for="f-projectId">פרויקט מקושר (לא חובה)</label><select id="f-projectId"><option value="">—</option>${state.projects.map((p) => `<option value="${escAttr(p.id)}" ${p.id === t.projectId ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
+    </div>
+    <div class="form-field">
+      <label>גם רלוונטי ל (לא חובה, אפשר יותר מאחד)</label>
+      <div class="checkbox-group">
+        ${ASSIGNABLE_NAMES.map((name) => `
+          <label><input type="checkbox" class="also-relevant-cb" value="${escAttr(name)}" ${(t.alsoRelevantTo || []).includes(name) ? "checked" : ""}> ${esc(name)}</label>
+        `).join("")}
+      </div>
     </div>
     <div class="form-field"><label for="f-next">השלב הבא (לא חובה)</label><input type="text" id="f-next" value="${escAttr(t.next && t.next !== "—" ? t.next : "")}"></div>
     <div class="modal-section" id="subtaskSection" style="display:${taskType === "תהליכית" ? "block" : "none"}">
@@ -323,7 +478,7 @@ function projectFormBody(p) {
     <div class="form-field"><label for="f-name">שם הפרויקט <span class="req-hint">*</span></label><input type="text" id="f-name" required value="${escAttr(p.name || "")}"></div>
     <div class="form-grid">
       <div class="form-field"><label for="f-category">תחום</label><select id="f-category">${optionList(CATEGORY_LIST, p.category)}</select></div>
-      <div class="form-field"><label for="f-owner">אחראי מוביל <span class="req-hint">*</span></label><select id="f-owner">${optionList(ASSIGNABLE_NAMES, p.owner || ASSIGNABLE_NAMES[0])}</select></div>
+      <div class="form-field"><label for="f-owner">מוביל <span class="req-hint">*</span></label><select id="f-owner">${optionList(ASSIGNABLE_NAMES, p.owner || ASSIGNABLE_NAMES[0])}</select></div>
       <div class="form-field"><label for="f-status">סטטוס</label><select id="f-status">${STATUS_ORDER.map((s) => `<option value="${s}" ${s === p.status ? "selected" : ""}>${STATUS_LABEL[s]}</option>`).join("")}</select></div>
       <div class="form-field"><label for="f-priority">עדיפות</label><select id="f-priority">${optionList(PRIORITY_OPTIONS, p.priority || "רגיל")}</select></div>
       <div class="form-field"><label for="f-target">יעד לסיום (לא חובה)</label><input type="date" id="f-target" value="${escAttr(p.target || "")}"></div>
@@ -466,13 +621,15 @@ async function saveFromForm(kind, existing) {
         subtasks.push(sub);
       });
     }
-    const owner = val("f-owner"); // select מוגבל ל-לירן/מורן — "אחראי יחיד" נאכף מבנית
+    const owner = val("f-owner"); // select מוגבל ל-לירן/מורן — שדה "מוביל" יחיד וחובה, נאכף מבנית
+    const alsoRelevantTo = [...document.querySelectorAll(".also-relevant-cb:checked")].map((cb) => cb.value);
     const obj = {
       ...(existing || {}),
       id: existing ? existing.id : nextId("TSK", state.tasks.map((t) => t.id)),
       name,
       category: val("f-category"),
       owner,
+      alsoRelevantTo,
       status: val("f-status"),
       taskType,
       dueDate: val("f-dueDate") || null,

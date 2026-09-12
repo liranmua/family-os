@@ -145,6 +145,36 @@ header .sub { font-size: 12.5px; opacity: .75; margin-top: 3px; }
 .link-btn:hover { color: var(--text-primary); }
 .settings-sub { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px; }
 
+/* ---- פרויקטים: כרטיס לחיץ (drill-in) ---- */
+.card.row-click { cursor: pointer; }
+.card.row-click:hover { box-shadow: 0 2px 8px rgba(0,0,0,.09); }
+.card-chevron { margin-top: 10px; font-size: 12px; color: var(--text-secondary); text-align: left; }
+
+/* ---- מסך פרויקט: קישורים ---- */
+.linkrow { display: flex; align-items: center; gap: 8px; background: #FAF9F6; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
+.linkrow a { flex: 1; font-size: 13px; color: var(--text-primary); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.linkrow a:hover { text-decoration: underline; }
+
+/* ---- "גם רלוונטי ל" — בחירה מרובה ---- */
+.checkbox-group { display: flex; gap: 16px; flex-wrap: wrap; padding-top: 4px; }
+.checkbox-group label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-primary); cursor: pointer; }
+.checkbox-group input { width: 15px; height: 15px; accent-color: var(--accent-fin); cursor: pointer; }
+
+/* ---- מסך משימות: דשבורד (מונה + דחופות לפי קטגוריה) ---- */
+.tasks-counter { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.tc-num { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tc-lbl { font-size: 13px; color: var(--text-secondary); }
+.urgent-groups { display: flex; flex-direction: column; gap: 10px; margin-bottom: var(--gap); }
+.urgent-group { background: var(--bg-card); border-radius: 12px; padding: 10px 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.ug-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); border-inline-start: 3px solid var(--neutral); padding-inline-start: 8px; margin-bottom: 8px; }
+.urgent-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; background: none; border: none; font-family: inherit; text-align: right; padding: 7px 4px; cursor: pointer; border-radius: 6px; }
+.urgent-item:hover { background: #FAF9F6; }
+.ui-name { font-size: 13.5px; }
+.ui-meta { font-size: 11.5px; color: var(--text-secondary); white-space: nowrap; }
+.task-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.task-toolbar .filters { margin-bottom: 0; }
+.search-input { flex: 1; min-width: 160px; padding: 8px 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 13px; font-family: inherit; background: var(--bg-card); color: var(--text-primary); }
+
 @media (max-width: 480px) {
   .tiles { grid-template-columns: 1fr 1fr; gap: 10px; }
   .tile { padding: 13px 13px 12px; min-height: 74px; }

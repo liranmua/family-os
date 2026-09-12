@@ -1,6 +1,6 @@
 // Family OS — ניווט בין מסכים (Hub + אזורים). שכבת DOM נקייה, בלי תלות ב-state.
 
-const SCREENS = ["hub", "tasks", "routines", "shopping", "finance", "projects", "calendar", "settings"];
+const SCREENS = ["hub", "tasks", "routines", "shopping", "finance", "projects", "project-detail", "calendar", "settings"];
 
 export function showScreen(name) {
   if (!SCREENS.includes(name)) name = "hub";

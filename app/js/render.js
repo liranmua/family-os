@@ -6,7 +6,10 @@ import {
   CATEGORY_COLOR, PEOPLE, STATUS_LABEL, STATUS_CLASS, TYPE_META,
   formatDateDisplay, todayStr, esc,
 } from "./constants.js";
-import { openItemForm, openTaskDetail, openUpdateForm, openFinanceForm } from "./forms.js";
+import {
+  openItemForm, openTaskDetail, openUpdateForm, openFinanceForm,
+  openProjectDetail, refreshProjectDetailIfOpen,
+} from "./forms.js";
 import { showScreen } from "./nav.js";
 
 let activeCategoryFilter = "";
@@ -29,10 +32,6 @@ export function projectProgress(p) {
 export function subtaskProgress(t) {
   const subs = t.subtasks || [];
   return { total: subs.length, done: subs.filter((s) => s.done).length };
-}
-
-function getUpdates(entityType, entityId) {
-  return state.updatesLog.filter((u) => u.entityType === entityType && u.entityId === entityId);
 }
 
 export function todaysCompletion(routineId) {
@@ -112,15 +111,11 @@ export function renderProjects() {
     list
       .map((p) => {
         const prog = projectProgress(p);
-        const log = getUpdates("project", p.id);
         return `
-      <div class="card" style="border-color:${CATEGORY_COLOR[p.category] || "var(--neutral)"}">
+      <div class="card row-click" data-open-project="${esc(p.id)}" style="border-color:${CATEGORY_COLOR[p.category] || "var(--neutral)"}">
         <div class="top-row">
           <h3>${esc(p.name)}</h3>
-          <div style="display:flex;gap:6px;align-items:flex-start">
-            <span class="badge status-pill ${STATUS_CLASS[p.status]}">${STATUS_LABEL[p.status]}</span>
-            <button class="icon-edit-btn" data-edit-project="${esc(p.id)}" aria-label="עריכה">✏️</button>
-          </div>
+          <span class="badge status-pill ${STATUS_CLASS[p.status]}">${STATUS_LABEL[p.status]}</span>
         </div>
         <div class="meta">
           <span>👤 ${esc(p.owner)}</span>
@@ -133,26 +128,13 @@ export function renderProjects() {
           <div class="progress-track"><div class="progress-fill" style="width:${prog.pct}%"></div></div>
           <span class="progress-label">${prog.done}/${prog.total} משימות הושלמו · ${prog.pct}%</span>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
-          <span class="hist-lbl" style="font-size:11px;color:var(--text-secondary)">לוג עדכונים${log.length ? ` (${log.length})` : ""}</span>
-          <button class="icon-edit-btn" data-add-update="${esc(p.id)}">+ עדכון</button>
-        </div>
-        ${
-          log.length
-            ? `<div class="log-list" style="margin-top:6px">${log
-                .map((l) => `<div class="log-entry">${esc(l.note)}<span class="log-meta">${esc(l.author)} · ${formatDateDisplay(l.date) || esc(l.date)}</span></div>`)
-                .join("")}</div>`
-            : `<div class="log-empty">אין עוד עדכונים לפרויקט הזה</div>`
-        }
+        <div class="card-chevron">פתיחת פרויקט ›</div>
       </div>`;
       })
       .join("") + `<div class="card add-row" id="addProjectCard">+ פרויקט חדש</div>`;
 
-  el.querySelectorAll("[data-edit-project]").forEach((btn) =>
-    btn.addEventListener("click", (e) => { e.stopPropagation(); openItemForm("project", btn.dataset.editProject); })
-  );
-  el.querySelectorAll("[data-add-update]").forEach((btn) =>
-    btn.addEventListener("click", (e) => { e.stopPropagation(); openUpdateForm("project", btn.dataset.addUpdate); })
+  el.querySelectorAll("[data-open-project]").forEach((card) =>
+    card.addEventListener("click", () => openProjectDetail(card.dataset.openProject))
   );
   const addCard = document.getElementById("addProjectCard");
   if (addCard) addCard.addEventListener("click", () => openItemForm("project"));
@@ -160,8 +142,63 @@ export function renderProjects() {
 
 // ---- Tasks ----
 
+let taskSearchQuery = "";
+export function setTaskSearchQuery(q) { taskSearchQuery = q; }
+export function getTaskSearchQuery() { return taskSearchQuery; }
+
+function filteredTasksList() {
+  let list = byCat(state.tasks);
+  const q = taskSearchQuery.trim().toLowerCase();
+  if (q) list = list.filter((t) => t.name.toLowerCase().includes(q));
+  return list;
+}
+
+function renderTasksDashboard() {
+  const dash = document.getElementById("tasksDashboard");
+  if (!dash) return;
+  const today = todayStr();
+  const open = state.tasks.filter((t) => t.status !== "done");
+  const urgent = open.filter((t) => (t.dueDate && t.dueDate <= today) || t.priority === "דחוף");
+  const byCategory = {};
+  urgent.forEach((t) => { (byCategory[t.category] ||= []).push(t); });
+  const cats = Object.keys(byCategory);
+
+  dash.innerHTML = `
+    <div class="tasks-counter">
+      <span class="tc-num">${open.length}</span>
+      <span class="tc-lbl">משימות פתוחות</span>
+      ${urgent.length ? `<span class="pill pill-bad">${urgent.length} דחופות</span>` : ""}
+    </div>
+    ${
+      cats.length
+        ? `<div class="urgent-groups">${cats
+            .map(
+              (cat) => `
+        <div class="urgent-group">
+          <div class="ug-head" style="border-color:${CATEGORY_COLOR[cat] || "var(--neutral)"}">${esc(cat)}</div>
+          ${byCategory[cat]
+            .map(
+              (t) => `
+            <button class="urgent-item" data-open-task="${esc(t.id)}">
+              <span class="ui-name">${esc(t.name)}</span>
+              <span class="ui-meta">${esc(t.owner)}${t.dueDate ? " · " + formatDateDisplay(t.dueDate) : ""}</span>
+            </button>`
+            )
+            .join("")}
+        </div>`
+            )
+            .join("")}</div>`
+        : `<div class="log-empty">אין משימות דחופות כרגע 🎉</div>`
+    }`;
+
+  dash.querySelectorAll("[data-open-task]").forEach((btn) =>
+    btn.addEventListener("click", () => openTaskDetail(btn.dataset.openTask))
+  );
+}
+
 export function renderTasks() {
-  const list = byCat(state.tasks);
+  renderTasksDashboard();
+  const list = filteredTasksList();
   const rows = list.length
     ? list
         .map((t) => {
@@ -186,10 +223,10 @@ export function renderTasks() {
         </tr>`;
         })
         .join("")
-    : `<tr class="empty-row"><td colspan="8">אין משימות${activeCategoryFilter ? " בתחום הזה" : ""} — הוסיפו אחת עם הכפתור למעלה</td></tr>`;
+    : `<tr class="empty-row"><td colspan="8">${taskSearchQuery.trim() ? "לא נמצאו משימות תואמות לחיפוש" : `אין משימות${activeCategoryFilter ? " בתחום הזה" : ""} — הוסיפו אחת עם הכפתור למעלה`}</td></tr>`;
 
   document.getElementById("tasksTable").innerHTML = `
-    <thead><tr><th>משימה</th><th>תחום</th><th>אחראי</th><th>תאריך</th><th>סטטוס</th><th>התקדמות</th><th>נוגע ל</th><th></th></tr></thead>
+    <thead><tr><th>משימה</th><th>תחום</th><th>מוביל</th><th>תאריך</th><th>סטטוס</th><th>התקדמות</th><th>נוגע ל</th><th></th></tr></thead>
     <tbody>${rows}</tbody>`;
 
   document.querySelectorAll("#tasksTable tr.row-click").forEach((row) => {
@@ -354,4 +391,5 @@ export function renderAll() {
   renderRoutines(_onRoutineToggle);
   renderShopping();
   renderPeople();
+  refreshProjectDetailIfOpen();
 }

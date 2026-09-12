@@ -46,7 +46,11 @@
   <!-- ===== משימות ===== -->
   <div class="screen" id="screen-tasks" hidden>
     <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>✅ משימות</h2></div>
-    <div class="filters" id="filtersTasks"></div>
+    <div id="tasksDashboard"></div>
+    <div class="task-toolbar">
+      <input type="search" id="taskSearchInput" placeholder="🔍 חיפוש משימה…" class="search-input">
+      <div class="filters" id="filtersTasks"></div>
+    </div>
     <div class="toolbar-row"><button class="btn-primary" id="addTaskBtn">+ משימה חדשה</button></div>
     <div class="table-wrap"><table id="tasksTable"></table></div>
   </div>
@@ -77,6 +81,12 @@
     <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>🧩 פרויקטים</h2></div>
     <div class="filters" id="filtersProjects"></div>
     <div class="cards" id="projectsCards"></div>
+  </div>
+
+  <!-- ===== פרויקט בודד (drill-in) ===== -->
+  <div class="screen" id="screen-project-detail" hidden>
+    <div class="screen-head"><button class="back-btn" data-back="projects">‹ חזרה</button><h2 id="pdTitle">🧩</h2></div>
+    <div id="projectDetailBody"></div>
   </div>
 
   <!-- ===== יומן (עדיין לא מחובר — נבנה בשלב הבא) ===== -->

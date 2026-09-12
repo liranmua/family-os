@@ -3,7 +3,7 @@
 import { loadState, resetAll, upsert, state, setChangeHandler, setSyncHandler } from "./state.js";
 import { CATEGORY_LIST, todayStr } from "./constants.js";
 import {
-  renderAll, setCategoryFilter, getCategoryFilter, setRoutineToggleHandler,
+  renderAll, renderTasks, setCategoryFilter, getCategoryFilter, setTaskSearchQuery, setRoutineToggleHandler,
 } from "./render.js";
 import { openItemForm } from "./forms.js";
 import { initNotifications, requestPermission } from "./notifications.js";
@@ -84,9 +84,19 @@ function wireAuth() {
 
 // ---- ניווט: Hub + חזרה + הגדרות ----
 function wireNav() {
-  document.querySelectorAll("[data-back]").forEach((b) => b.addEventListener("click", () => showScreen("hub")));
+  document.querySelectorAll("[data-back]").forEach((b) => b.addEventListener("click", () => showScreen(b.dataset.back || "hub")));
   const settingsBtn = document.getElementById("openSettingsBtn");
   if (settingsBtn) settingsBtn.addEventListener("click", () => showScreen("settings"));
+}
+
+// ---- חיפוש משימות (מחווט פעם אחת — כדי לא לאבד פוקוס תוך כדי הקלדה) ----
+function wireTaskSearch() {
+  const input = document.getElementById("taskSearchInput");
+  if (!input) return;
+  input.addEventListener("input", (e) => {
+    setTaskSearchQuery(e.target.value);
+    renderTasks();
+  });
 }
 
 // ---- פילטר תחום (מופיע בכמה אזורים, כולם על אותו מסנן משותף) ----
@@ -205,6 +215,7 @@ async function main() {
 
   wireNav();
   wireButtons();
+  wireTaskSearch();
   wireOverlay();
   wireAuth();
   initAuth(renderAuth).catch((e) => console.warn("initAuth failed:", e));
