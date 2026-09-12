@@ -467,7 +467,7 @@ function routineFormBody(r) {
     <div class="form-field"><label for="f-name">שם השגרה <span class="req-hint">*</span></label><input type="text" id="f-name" required value="${escAttr(r.name || "")}"></div>
     <div class="form-grid">
       <div class="form-field"><label for="f-category">תחום</label><select id="f-category">${optionList(CATEGORY_LIST, r.category)}</select></div>
-      <div class="form-field"><label for="f-assignee">אחראי יחיד <span class="req-hint">*</span></label><select id="f-assignee">${optionList(ASSIGNABLE_NAMES, r.assignee || ASSIGNABLE_NAMES[0])}</select></div>
+      <div class="form-field"><label for="f-assignee">מוביל <span class="req-hint">*</span></label><select id="f-assignee">${optionList(ASSIGNABLE_NAMES, r.assignee || ASSIGNABLE_NAMES[0])}</select></div>
       <div class="form-field"><label for="f-active">פעילה</label><select id="f-active"><option value="true" ${r.active !== false ? "selected" : ""}>כן</option><option value="false" ${r.active === false ? "selected" : ""}>לא</option></select></div>
     </div>
     <div class="form-field"><label for="f-notes">הערות (לא חובה)</label><input type="text" id="f-notes" value="${escAttr(r.notes || "")}"></div>`;
