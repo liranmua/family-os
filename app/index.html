@@ -67,6 +67,7 @@
   <div class="screen" id="screen-shopping" hidden>
     <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>🛒 רשימת קניות</h2></div>
     <div class="store-tabs" id="storeTabs"></div>
+    <div class="shop-subtotal" id="shopSubtotal"></div>
     <div class="toolbar-row"><button class="btn-primary" id="addShopBtn">+ פריט קניות</button></div>
     <div class="table-wrap"><table id="shopTable"></table></div>
   </div>
@@ -90,13 +91,10 @@
     <div id="projectDetailBody"></div>
   </div>
 
-  <!-- ===== יומן (עדיין לא מחובר — נבנה בשלב הבא) ===== -->
+  <!-- ===== יומן (קריאה בלבד, של לירן בלבד בשלב זה) ===== -->
   <div class="screen" id="screen-calendar" hidden>
     <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>📅 יומן</h2></div>
-    <div class="log-empty">
-      חיבור אמיתי ליומן Google (קריאה בלבד) עדיין לא נבנה — זה השלב הבא בתור הבנייה.
-      אין כרגע נתונים אמיתיים להציג כאן.
-    </div>
+    <div id="calendarBody"></div>
   </div>
 
   <!-- ===== הגדרות ===== -->

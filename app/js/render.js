@@ -11,6 +11,10 @@ import {
   openProjectDetail, refreshProjectDetailIfOpen,
 } from "./forms.js";
 import { showScreen } from "./nav.js";
+import {
+  isConnected as calIsConnected, getEvents as calGetEvents, getLastFetchedAt as calGetLastFetchedAt,
+  getLastError as calGetLastError, connectCalendar, fetchEvents as calFetchEvents, disconnectCalendar,
+} from "./calendar.js";
 
 let activeCategoryFilter = "";
 export function setCategoryFilter(v) { activeCategoryFilter = v; }
@@ -62,6 +66,13 @@ export function renderHub() {
   const budgetLbl = f.budgetFree != null ? `₪${Number(f.budgetFree).toLocaleString("he-IL")}` : "—";
   const goalLbl = f.savingsGoalPct != null ? `${f.savingsGoalPct}%` : "—";
 
+  const calConnected = calIsConnected();
+  const calTodayCount = calGetEvents().filter((ev) => (ev.start || "").slice(0, 10) === today).length;
+  const calGlancePill = calConnected
+    ? `<span class="pill pill-mut">${calTodayCount} היום</span>`
+    : `<span class="pill pill-warn">לא מחובר</span>`;
+  const calTileSub = calConnected ? `${calTodayCount} אירועים היום` : "לא מחובר — הקישו לחיבור";
+
   glanceEl.innerHTML = `
     <div class="glance-title">היום</div>
     <button class="glance-row" data-go="tasks">
@@ -74,7 +85,7 @@ export function renderHub() {
     </button>
     <button class="glance-row" data-go="calendar">
       <span class="gi">📅</span><span>יומן</span>
-      <span class="pill pill-mut">בקרוב</span>
+      ${calGlancePill}
     </button>
     <button class="glance-row" data-go="shopping">
       <span class="gi">🛒</span><span>רשימת קניות</span>
@@ -84,7 +95,7 @@ export function renderHub() {
   const tiles = [
     { key: "tasks", cls: "tc-tasks", icon: "✅", name: "משימות", sub: `${openTasks.length} פתוחות${overdue.length ? ` · ${overdue.length} באיחור` : ""}` },
     { key: "shopping", cls: "tc-shop", icon: "🛒", name: "קניות", sub: `${shortShopping.length} חסרים` },
-    { key: "calendar", cls: "tc-cal", icon: "📅", name: "יומן", sub: "בקרוב" },
+    { key: "calendar", cls: "tc-cal", icon: "📅", name: "יומן", sub: calTileSub },
     { key: "finance", cls: "tc-fin", icon: "💰", name: "פיננסים", sub: `פנוי ${budgetLbl} · יעד ${goalLbl}` },
     { key: "projects", cls: "tc-proj", icon: "🧩", name: "פרויקטים", sub: `${activeProjects.length} פעילים` },
     { key: "routines", cls: "tc-routine", icon: "🔁", name: "שגרות", sub: `${activeRoutines.length} פעילות · ${routinesDoneToday}/${activeRoutines.length} היום` },
@@ -311,27 +322,57 @@ function renderStoreTabs() {
   );
 }
 
+// מחיר ליחידה × כמות. כמות היא טקסט חופשי ("2", "1 ק״ג", "קרטון") — מוציאים
+// ממנה מספר מוביל אם יש, אחרת מניחים יחידה אחת.
+function lineTotal(s) {
+  if (s.price == null) return null;
+  const qtyNum = parseFloat(s.qty);
+  const mult = Number.isFinite(qtyNum) && qtyNum > 0 ? qtyNum : 1;
+  return s.price * mult;
+}
+function fmtMoney(n) {
+  const r = Math.round(n * 100) / 100;
+  return Number.isInteger(r) ? `₪${r}` : `₪${r.toFixed(2)}`;
+}
+
+function renderShopSubtotal(list) {
+  const el = document.getElementById("shopSubtotal");
+  if (!el) return;
+  const relevant = list.filter((s) => s.status !== "במלאי");
+  if (!relevant.length) { el.innerHTML = ""; return; }
+  const withPrice = relevant.filter((s) => s.price != null);
+  const total = withPrice.reduce((sum, s) => sum + (lineTotal(s) || 0), 0);
+  el.innerHTML = `
+    <span class="shop-subtotal-label">סך הכל לרשימה (לא כולל "במלאי")</span>
+    <span class="shop-subtotal-value">${fmtMoney(total)}</span>
+    ${withPrice.length < relevant.length ? `<span class="shop-subtotal-note">(${relevant.length - withPrice.length} בלי מחיר)</span>` : ""}`;
+}
+
 export function renderShopping() {
   renderStoreTabs();
   const list = state.shopping.filter((s) => itemStoreType(s) === activeStoreType);
+  renderShopSubtotal(list);
   const rows = list.length
     ? list
-        .map(
-          (s) => `
+        .map((s) => {
+          const lt = lineTotal(s);
+          return `
         <tr class="row-click" data-shop-id="${esc(s.id)}" tabindex="0">
           <td>${esc(s.name)}</td>
           <td>${esc(s.category || "—")}</td>
           <td>${esc(s.qty || "—")}</td>
+          <td>${s.price != null ? fmtMoney(s.price) : "—"}</td>
+          <td>${lt != null ? fmtMoney(lt) : "—"}</td>
           <td>${esc(s.notes || "—")}</td>
           <td><span class="shop-pill shop-${esc(s.status)}">${esc(s.status)}</span></td>
           <td class="chevron">›</td>
-        </tr>`
-        )
+        </tr>`;
+        })
         .join("")
-    : `<tr class="empty-row"><td colspan="6">הרשימה "${esc(activeStoreType)}" ריקה — הוסיפו פריט עם הכפתור למעלה</td></tr>`;
+    : `<tr class="empty-row"><td colspan="8">הרשימה "${esc(activeStoreType)}" ריקה — הוסיפו פריט עם הכפתור למעלה</td></tr>`;
 
   document.getElementById("shopTable").innerHTML = `
-    <thead><tr><th>פריט</th><th>קטגוריה</th><th>כמות</th><th>הערות</th><th>סטטוס</th><th></th></tr></thead>
+    <thead><tr><th>פריט</th><th>קטגוריה</th><th>כמות</th><th>מחיר</th><th>סה״כ</th><th>הערות</th><th>סטטוס</th><th></th></tr></thead>
     <tbody>${rows}</tbody>`;
 
   document.querySelectorAll("#shopTable tr.row-click").forEach((row) => {
@@ -339,6 +380,90 @@ export function renderShopping() {
     row.addEventListener("click", open);
     row.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
   });
+}
+
+// ---- יומן (קריאה בלבד) ----
+
+function fmtEventTime(ev) {
+  if (ev.allDay) return "כל היום";
+  const d = new Date(ev.start);
+  if (isNaN(d)) return "";
+  return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+}
+function fmtDayLabel(dayIso) {
+  const today = todayStr();
+  if (dayIso === today) return "היום";
+  const tmr = new Date();
+  tmr.setDate(tmr.getDate() + 1);
+  if (dayIso === todayStr(tmr)) return "מחר";
+  const d = new Date(dayIso + "T00:00:00");
+  return d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "numeric" });
+}
+
+export function renderCalendarScreen() {
+  const body = document.getElementById("calendarBody");
+  if (!body) return;
+  const err = calGetLastError();
+
+  if (!calIsConnected()) {
+    body.innerHTML = `
+      <div class="log-empty" style="margin-bottom:12px">
+        עדיין לא מחובר. לאחר החיבור תוצג כאן תצוגת <b>קריאה בלבד</b> של היומן שלך —
+        האפליקציה לא יוצרת, לא עורכת ולא מוחקת שום דבר ביומן. כרגע רק היומן של לירן;
+        מורן תתחבר בנפרד בהמשך.
+      </div>
+      ${err ? `<div class="field-error" style="margin-bottom:10px">${esc(err)}</div>` : ""}
+      <button class="btn-primary" id="calConnectBtn">חבר את יומן Google</button>`;
+    document.getElementById("calConnectBtn").addEventListener("click", connectCalendar);
+    return;
+  }
+
+  const evs = calGetEvents();
+  const groups = {};
+  evs.forEach((ev) => {
+    const day = (ev.start || "").slice(0, 10);
+    if (!day) return;
+    (groups[day] ||= []).push(ev);
+  });
+  const days = Object.keys(groups).sort();
+  const last = calGetLastFetchedAt();
+
+  body.innerHTML = `
+    <div class="toolbar-row" style="justify-content:space-between;align-items:center">
+      <span style="font-size:12px;color:var(--text-secondary)">
+        ${last ? `עודכן ${last.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}` : "טרם נטען"}
+      </span>
+      <div style="display:flex;gap:6px">
+        <button class="icon-edit-btn" id="calRefreshBtn">🔄 רענון</button>
+        <button class="icon-edit-btn" id="calDisconnectBtn">התנתקות</button>
+      </div>
+    </div>
+    ${err ? `<div class="field-error" style="margin-bottom:10px">${esc(err)}</div>` : ""}
+    ${
+      days.length
+        ? days
+            .map(
+              (day) => `
+        <div class="cal-day">
+          <div class="cal-day-head">${esc(fmtDayLabel(day))}</div>
+          ${groups[day]
+            .map(
+              (ev) => `
+            <div class="cal-event">
+              <span class="cal-time">${esc(fmtEventTime(ev))}</span>
+              <span class="cal-title">${esc(ev.title)}</span>
+            </div>`
+            )
+            .join("")}
+        </div>`
+            )
+            .join("")
+        : `<div class="log-empty">אין אירועים בימים הקרובים</div>`
+    }
+    <p class="footer-note" style="margin-top:14px">קריאה בלבד — לעריכה, פותחים את Google Calendar</p>`;
+
+  document.getElementById("calRefreshBtn").addEventListener("click", () => calFetchEvents());
+  document.getElementById("calDisconnectBtn").addEventListener("click", () => disconnectCalendar());
 }
 
 // ---- Finance (תצוגה מופשטת — לא טבלת נתונים גולמית) ----
@@ -413,5 +538,6 @@ export function renderAll() {
   renderRoutines(_onRoutineToggle);
   renderShopping();
   renderPeople();
+  renderCalendarScreen();
   refreshProjectDetailIfOpen();
 }

@@ -495,6 +495,7 @@ function shoppingFormBody(s) {
       <div class="form-field"><label for="f-storeType">רשימה</label><select id="f-storeType">${optionList(SHOP_STORE_TYPES, storeType)}</select></div>
       <div class="form-field"><label for="f-category">קטגוריה</label><select id="f-category">${optionList(SHOP_CATEGORY_OPTIONS, s.category || "אחר")}</select></div>
       <div class="form-field"><label for="f-qty">כמות</label><input type="text" id="f-qty" value="${escAttr(s.qty || "")}" placeholder="למשל 2 / קרטון"></div>
+      <div class="form-field"><label for="f-price">מחיר ליחידה (₪, לא חובה)</label><input type="number" id="f-price" step="0.1" min="0" value="${s.price != null ? escAttr(s.price) : ""}" placeholder="למשל 12.90"></div>
       <div class="form-field"><label for="f-status">סטטוס</label><select id="f-status">${optionList(SHOP_STATUS_OPTIONS, s.status || "חסר")}</select></div>
     </div>
     <div class="form-field"><label for="f-notes">הערות (לא חובה)</label><input type="text" id="f-notes" value="${escAttr(s.notes || "")}" placeholder="למשל: הסוג האורגני"></div>`;
@@ -671,12 +672,14 @@ async function saveFromForm(kind, existing) {
     };
     await upsert("project", obj);
   } else if (kind === "shopping") {
+    const priceVal = val("f-price");
     const obj = {
       ...(existing || {}),
       name,
       storeType: val("f-storeType"),
       category: val("f-category"),
       qty: trimVal("f-qty"),
+      price: priceVal !== "" ? Number(priceVal) : null,
       notes: trimVal("f-notes") || null,
       status: val("f-status"),
     };

@@ -9,6 +9,7 @@ import { openItemForm } from "./forms.js";
 import { initNotifications, requestPermission } from "./notifications.js";
 import { deviceLabel } from "./cloud.js";
 import { initAuth, signIn, signOutUser, currentUserName } from "./auth.js";
+import { initCalendar } from "./calendar.js";
 import { showScreen } from "./nav.js";
 
 const FILTER_CONTAINERS = ["filtersTasks", "filtersRoutines", "filtersProjects"];
@@ -226,6 +227,8 @@ async function main() {
   announceMigration();
 
   await initNotifications(reg || (await navigator.serviceWorker?.ready.catch(() => null)));
+
+  initCalendar(onStateChange).catch((e) => console.warn("initCalendar failed:", e));
 }
 
 main();
