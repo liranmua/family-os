@@ -74,8 +74,8 @@ export function buildSeed() {
       { id: "ROU-002__" + plusDays(-1), routineId: "ROU-002", date: plusDays(-1), done: true, by: "לירן" },
     ],
     shopping: [
-      { id: "SHP-001", name: "חלב", category: "אוכל", qty: "2", status: "חסר", store: "סופר" },
-      { id: "SHP-002", name: "נייר טואלט", category: "טואלטיקה", qty: "1", status: "חסר", store: "פארם" },
+      { id: "SHP-001", name: "חלב", storeType: "סופר", category: "אוכל", qty: "2", notes: null, status: "חסר" },
+      { id: "SHP-002", name: "נייר טואלט", storeType: "סופר-פארם", category: "טואלטיקה", qty: "1", notes: null, status: "חסר" },
     ],
     finance: {
       budgetFree: 2400,

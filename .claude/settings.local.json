@@ -40,7 +40,8 @@
       "Bash(firebase firestore:delete \"families/test_p2c\" --recursive --force --project family-os-poc)",
       "Bash(firebase firestore:delete \"families/test_p3\" --recursive --force --project family-os-poc)",
       "Bash(firebase firestore:delete \"families/test_hub1\" --recursive --force --project family-os-poc)",
-      "Bash(firebase firestore:delete \"families/test_fix1\" --recursive --force --project family-os-poc)"
+      "Bash(firebase firestore:delete \"families/test_fix1\" --recursive --force --project family-os-poc)",
+      "Bash(firebase firestore:delete \"families/test_shop1\" --recursive --force --project family-os-poc)"
     ]
   }
 }

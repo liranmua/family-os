@@ -34,6 +34,9 @@ export const PRIORITY_OPTIONS = ["דחוף", "רגיל", "נמוך"];
 export const FREQUENCY_OPTIONS = ["חד-פעמי", "שבועי", "חודשי"];
 export const SHOP_STATUS_OPTIONS = ["חסר", "בעגלה", "במלאי"];
 export const SHOP_CATEGORY_OPTIONS = ["אוכל", "טואלטיקה", "ניקיון", "ציוד ילדים", "אחר"];
+// שלוש רשימות קניות נפרדות (Family_OS_Shopping_Brief.md, סבב 1). "סופר" תקבל בהמשך
+// (סבב 2) זיכרון פריטים חוזרים — לא חלק מהסבב הזה.
+export const SHOP_STORE_TYPES = ["סופר", "סופר-פארם", "בית-אחר"];
 
 // ---- כלי עזר ----
 

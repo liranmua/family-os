@@ -3,7 +3,7 @@
 
 import { state } from "./state.js";
 import {
-  CATEGORY_COLOR, PEOPLE, STATUS_LABEL, STATUS_CLASS, TYPE_META,
+  CATEGORY_COLOR, PEOPLE, STATUS_LABEL, STATUS_CLASS, TYPE_META, SHOP_STORE_TYPES,
   formatDateDisplay, todayStr, esc,
 } from "./constants.js";
 import {
@@ -288,10 +288,32 @@ export function renderRoutines(onToggle) {
   );
 }
 
-// ---- Shopping ----
+// ---- Shopping: שלוש רשימות נפרדות לפי סוג חנות ----
+
+let activeStoreType = SHOP_STORE_TYPES[0];
+export function setActiveStoreType(v) { activeStoreType = v; }
+export function getActiveStoreType() { return activeStoreType; }
+
+function itemStoreType(s) { return s.storeType || SHOP_STORE_TYPES[0]; }
+
+function renderStoreTabs() {
+  const tabsEl = document.getElementById("storeTabs");
+  if (!tabsEl) return;
+  tabsEl.innerHTML = SHOP_STORE_TYPES.map((st) => {
+    const count = state.shopping.filter((s) => itemStoreType(s) === st && s.status !== "במלאי").length;
+    return `
+      <button class="store-tab ${st === activeStoreType ? "active" : ""}" data-store-tab="${esc(st)}">
+        ${esc(st)}${count ? `<span class="store-tab-count">${count}</span>` : ""}
+      </button>`;
+  }).join("");
+  tabsEl.querySelectorAll("[data-store-tab]").forEach((btn) =>
+    btn.addEventListener("click", () => { setActiveStoreType(btn.dataset.storeTab); renderShopping(); })
+  );
+}
 
 export function renderShopping() {
-  const list = state.shopping;
+  renderStoreTabs();
+  const list = state.shopping.filter((s) => itemStoreType(s) === activeStoreType);
   const rows = list.length
     ? list
         .map(
@@ -300,16 +322,16 @@ export function renderShopping() {
           <td>${esc(s.name)}</td>
           <td>${esc(s.category || "—")}</td>
           <td>${esc(s.qty || "—")}</td>
+          <td>${esc(s.notes || "—")}</td>
           <td><span class="shop-pill shop-${esc(s.status)}">${esc(s.status)}</span></td>
-          <td>${esc(s.store || "—")}</td>
           <td class="chevron">›</td>
         </tr>`
         )
         .join("")
-    : `<tr class="empty-row"><td colspan="6">רשימת הקניות ריקה — הוסיפו פריט עם הכפתור למעלה</td></tr>`;
+    : `<tr class="empty-row"><td colspan="6">הרשימה "${esc(activeStoreType)}" ריקה — הוסיפו פריט עם הכפתור למעלה</td></tr>`;
 
   document.getElementById("shopTable").innerHTML = `
-    <thead><tr><th>פריט</th><th>קטגוריה</th><th>כמות</th><th>סטטוס</th><th>חנות</th><th></th></tr></thead>
+    <thead><tr><th>פריט</th><th>קטגוריה</th><th>כמות</th><th>הערות</th><th>סטטוס</th><th></th></tr></thead>
     <tbody>${rows}</tbody>`;
 
   document.querySelectorAll("#shopTable tr.row-click").forEach((row) => {

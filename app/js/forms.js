@@ -4,10 +4,10 @@
 import { state, upsert, remove, saveFinance } from "./state.js";
 import {
   CATEGORY_LIST, ASSIGNABLE_NAMES, ALL_PEOPLE_NAMES, STATUS_LABEL, STATUS_CLASS, STATUS_ORDER,
-  TYPE_META, PRIORITY_OPTIONS, FREQUENCY_OPTIONS, SHOP_STATUS_OPTIONS, SHOP_CATEGORY_OPTIONS,
+  TYPE_META, PRIORITY_OPTIONS, FREQUENCY_OPTIONS, SHOP_STATUS_OPTIONS, SHOP_CATEGORY_OPTIONS, SHOP_STORE_TYPES,
   optionList, formatDateDisplay, nextId, todayStr, esc, escAttr,
 } from "./constants.js";
-import { renderAll, projectProgress, subtaskProgress } from "./render.js";
+import { renderAll, projectProgress, subtaskProgress, getActiveStoreType } from "./render.js";
 import { showScreen } from "./nav.js";
 
 const overlay = () => document.getElementById("modalOverlay");
@@ -488,14 +488,16 @@ function projectFormBody(p) {
 }
 
 function shoppingFormBody(s) {
+  const storeType = s.storeType || getActiveStoreType();
   return `
     <div class="form-field"><label for="f-name">שם הפריט <span class="req-hint">*</span></label><input type="text" id="f-name" required value="${escAttr(s.name || "")}"></div>
     <div class="form-grid">
+      <div class="form-field"><label for="f-storeType">רשימה</label><select id="f-storeType">${optionList(SHOP_STORE_TYPES, storeType)}</select></div>
       <div class="form-field"><label for="f-category">קטגוריה</label><select id="f-category">${optionList(SHOP_CATEGORY_OPTIONS, s.category || "אחר")}</select></div>
       <div class="form-field"><label for="f-qty">כמות</label><input type="text" id="f-qty" value="${escAttr(s.qty || "")}" placeholder="למשל 2 / קרטון"></div>
       <div class="form-field"><label for="f-status">סטטוס</label><select id="f-status">${optionList(SHOP_STATUS_OPTIONS, s.status || "חסר")}</select></div>
-      <div class="form-field"><label for="f-store">חנות יעד</label><input type="text" id="f-store" value="${escAttr(s.store || "")}" placeholder="סופר / פארם / …"></div>
-    </div>`;
+    </div>
+    <div class="form-field"><label for="f-notes">הערות (לא חובה)</label><input type="text" id="f-notes" value="${escAttr(s.notes || "")}" placeholder="למשל: הסוג האורגני"></div>`;
 }
 
 const TITLES = {
@@ -672,10 +674,11 @@ async function saveFromForm(kind, existing) {
     const obj = {
       ...(existing || {}),
       name,
+      storeType: val("f-storeType"),
       category: val("f-category"),
       qty: trimVal("f-qty"),
+      notes: trimVal("f-notes") || null,
       status: val("f-status"),
-      store: trimVal("f-store"),
     };
     if (existing) obj.id = existing.id;
     await upsert("shopping", obj);
