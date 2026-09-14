@@ -8,7 +8,7 @@ import {
 } from "./constants.js";
 import {
   openItemForm, openTaskDetail, openUpdateForm, openFinanceForm,
-  openProjectDetail, refreshProjectDetailIfOpen,
+  openProjectDetail, refreshProjectDetailIfOpen, openCalendarSettingsForm,
 } from "./forms.js";
 import { showScreen } from "./nav.js";
 import {
@@ -434,6 +434,7 @@ export function renderCalendarScreen() {
         ${last ? `עודכן ${last.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}` : "טרם נטען"}
       </span>
       <div style="display:flex;gap:6px">
+        <button class="icon-edit-btn" id="calSettingsBtn">📋 יומנים</button>
         <button class="icon-edit-btn" id="calRefreshBtn">🔄 רענון</button>
         <button class="icon-edit-btn" id="calDisconnectBtn">התנתקות</button>
       </div>
@@ -444,24 +445,25 @@ export function renderCalendarScreen() {
         ? days
             .map(
               (day) => `
-        <div class="cal-day">
-          <div class="cal-day-head">${esc(fmtDayLabel(day))}</div>
+        <div class="urgent-group">
+          <div class="ug-head" style="border-color:var(--accent-cal)">${esc(fmtDayLabel(day))}</div>
           ${groups[day]
             .map(
               (ev) => `
-            <div class="cal-event">
-              <span class="cal-time">${esc(fmtEventTime(ev))}</span>
-              <span class="cal-title">${esc(ev.title)}</span>
+            <div class="urgent-item" style="cursor:default">
+              <span class="ui-name">${esc(ev.title)}</span>
+              <span class="ui-meta">${esc(fmtEventTime(ev))}</span>
             </div>`
             )
             .join("")}
         </div>`
             )
             .join("")
-        : `<div class="log-empty">אין אירועים בימים הקרובים</div>`
+        : `<div class="log-empty">אין אירועים בשבוע הקרוב ביומנים המסומנים</div>`
     }
     <p class="footer-note" style="margin-top:14px">קריאה בלבד — לעריכה, פותחים את Google Calendar</p>`;
 
+  document.getElementById("calSettingsBtn").addEventListener("click", () => openCalendarSettingsForm());
   document.getElementById("calRefreshBtn").addEventListener("click", () => calFetchEvents());
   document.getElementById("calDisconnectBtn").addEventListener("click", () => disconnectCalendar());
 }

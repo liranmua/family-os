@@ -9,6 +9,10 @@ import {
 } from "./constants.js";
 import { renderAll, projectProgress, subtaskProgress, getActiveStoreType } from "./render.js";
 import { showScreen } from "./nav.js";
+import {
+  fetchCalendarList as calFetchCalendarList, getAllCalendars as calGetAllCalendars,
+  getSelectedCalendarIds as calGetSelectedCalendarIds, setSelectedCalendarIds as calSetSelectedCalendarIds,
+} from "./calendar.js";
 
 const overlay = () => document.getElementById("modalOverlay");
 const modalEl = () => document.getElementById("modal");
@@ -239,6 +243,55 @@ export function openFinanceForm() {
     closeModal();
     renderAll();
     showToast("תמונת הפיננסים עודכנה");
+  });
+}
+
+// ---- הגדרות יומן: אילו יומני גוגל מוצגים ----
+
+export async function openCalendarSettingsForm() {
+  openModal(`
+    <div class="modal-header"><h2>📋 יומנים מוצגים</h2><button class="modal-close" id="modalCloseBtn" aria-label="סגירה">✕</button></div>
+    <div class="modal-body"><div class="log-empty">טוען רשימת יומנים…</div></div>
+  `);
+  document.getElementById("modalCloseBtn").addEventListener("click", closeModal);
+  await calFetchCalendarList();
+  renderCalendarSettingsBody();
+}
+
+function renderCalendarSettingsBody() {
+  const cals = calGetAllCalendars();
+  const selected = new Set(calGetSelectedCalendarIds());
+  modalEl().innerHTML = `
+    <div class="modal-header"><h2>📋 יומנים מוצגים</h2><button class="modal-close" id="modalCloseBtn" aria-label="סגירה">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--text-secondary)">רק אירועים מהיומנים המסומנים יוצגו באפליקציה (קריאה בלבד — לא משפיע על היומן עצמו).</p>
+      ${
+        cals.length
+          ? `<div class="checkbox-group" style="flex-direction:column;align-items:flex-start;gap:10px">
+              ${cals
+                .map(
+                  (c) => `
+                <label><input type="checkbox" class="cal-select-cb" value="${escAttr(c.id)}" ${selected.has(c.id) ? "checked" : ""}> ${esc(c.summary)}${c.primary ? " (ראשי)" : ""}</label>`
+                )
+                .join("")}
+            </div>`
+          : `<div class="log-empty">לא נמצאו יומנים בחשבון.</div>`
+      }
+      <div class="form-actions">
+        <div></div>
+        <div class="form-actions-right">
+          <button type="button" class="btn-secondary" id="calSettingsCancel">ביטול</button>
+          <button type="button" class="btn-primary" id="calSettingsSave">שמירה</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById("modalCloseBtn").addEventListener("click", closeModal);
+  document.getElementById("calSettingsCancel").addEventListener("click", closeModal);
+  document.getElementById("calSettingsSave").addEventListener("click", async () => {
+    const ids = [...document.querySelectorAll(".cal-select-cb:checked")].map((cb) => cb.value);
+    await calSetSelectedCalendarIds(ids);
+    closeModal();
+    showToast("רשימת היומנים נשמרה");
   });
 }
 
