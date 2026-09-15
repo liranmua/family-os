@@ -9,7 +9,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // אוספים "רגילים" שמסתנכרנים. finance יושב ב-meta ומטופל בנפרד.
-export const COLLECTIONS = ["tasks", "routines", "routineCompletions", "projects", "shopping", "updatesLog"];
+export const COLLECTIONS = ["tasks", "routines", "routineCompletions", "projects", "shopping", "updatesLog", "weeklyBlocks"];
 
 const INIT_DOC = () => familyDoc("_meta", "init");
 

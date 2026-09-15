@@ -3,7 +3,7 @@
 
 import { state } from "./state.js";
 import {
-  CATEGORY_COLOR, PEOPLE, STATUS_LABEL, STATUS_CLASS, TYPE_META, SHOP_STORE_TYPES,
+  CATEGORY_COLOR, PEOPLE, STATUS_LABEL, STATUS_CLASS, TYPE_META, SHOP_STORE_TYPES, DAY_NAMES,
   formatDateDisplay, todayStr, esc,
 } from "./constants.js";
 import {
@@ -400,6 +400,106 @@ function fmtDayLabel(dayIso) {
   return d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "numeric" });
 }
 
+// שבעת התאריכים הקרובים (כולל היום), כל אחד עם ה-dayOfWeek שלו (כמו Date.getDay()) —
+// כדי לדעת אילו בלוקים מהלוח השבועי הקבוע חלים על כל תאריך בפועל.
+function weekDates() {
+  const out = [];
+  const now = new Date();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+    out.push({ iso: todayStr(d), dow: d.getDay() });
+  }
+  return out;
+}
+
+// תצוגת "השבוע" — מיזוג אירועי היומן האמיתיים עם בלוקי הלוח השבועי הפנימי, מקובץ
+// לפי יום. בלוק פנימי מסומן בבירור (class + תג "פנימי") כדי שלא ייראה כמו אירוע Google.
+function renderCalendarAgenda(container) {
+  const groups = {};
+  calGetEvents().forEach((ev) => {
+    const day = (ev.start || "").slice(0, 10);
+    if (!day) return;
+    (groups[day] ||= []).push(ev);
+  });
+
+  const dayBlocks = weekDates()
+    .map(({ iso, dow }) => {
+      const realItems = (groups[iso] || []).map((ev) => ({
+        time: fmtEventTime(ev), sortKey: (ev.start || "").slice(11, 16) || "00:00",
+        title: ev.title, isBlock: false,
+      }));
+      const blockItems = state.weeklyBlocks
+        .filter((b) => b.dayOfWeek === dow)
+        .map((b) => ({
+          time: [b.startTime, b.endTime].filter(Boolean).join("–") || "כל היום",
+          sortKey: b.startTime || "00:00",
+          title: b.title, leader: b.leader, isBlock: true,
+        }));
+      const items = [...realItems, ...blockItems].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+      return { iso, items };
+    })
+    .filter((d) => d.items.length);
+
+  container.innerHTML = dayBlocks.length
+    ? dayBlocks
+        .map(
+          ({ iso, items }) => `
+      <div class="urgent-group">
+        <div class="ug-head" style="border-color:var(--accent-cal)">${esc(fmtDayLabel(iso))}</div>
+        ${items
+          .map(
+            (it) => `
+          <div class="urgent-item ${it.isBlock ? "block-item" : ""}" style="cursor:default">
+            <span class="ui-name">${esc(it.title)}${it.isBlock ? `<span class="block-badge">🏠 פנימי · ${esc(it.leader)}</span>` : ""}</span>
+            <span class="ui-meta">${esc(it.time)}</span>
+          </div>`
+          )
+          .join("")}
+      </div>`
+        )
+        .join("")
+    : `<div class="log-empty">אין אירועים או בלוקים בשבוע הקרוב</div>`;
+}
+
+// תצוגת ניהול — CRUD על בלוקי הלוח השבועי הפנימי (weeklyBlocks). לעולם לא נכתב ל-Google.
+function renderCalendarManage(container) {
+  const list = [...state.weeklyBlocks].sort(
+    (a, b) => a.dayOfWeek - b.dayOfWeek || String(a.startTime || "").localeCompare(String(b.startTime || ""))
+  );
+  const rows = list.length
+    ? list
+        .map(
+          (b) => `
+        <tr class="row-click" data-block-id="${esc(b.id)}" tabindex="0">
+          <td>${esc(DAY_NAMES[b.dayOfWeek] ?? "—")}</td>
+          <td>${esc([b.startTime, b.endTime].filter(Boolean).join("–") || "—")}</td>
+          <td>${esc(b.title)}</td>
+          <td>${esc(b.leader)}</td>
+          <td>${esc(b.category || "—")}</td>
+          <td class="chevron">›</td>
+        </tr>`
+        )
+        .join("")
+    : `<tr class="empty-row"><td colspan="6">אין עדיין בלוקים בלוח השבועי — הוסיפו אחד עם הכפתור למעלה</td></tr>`;
+
+  container.innerHTML = `
+    <div class="toolbar-row"><button class="btn-primary" id="addWeeklyBlockBtn">+ בלוק שבועי</button></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>יום</th><th>שעות</th><th>כותרת</th><th>מוביל</th><th>תחום</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <p class="footer-note" style="margin-top:14px">בלוקים אלה פנימיים לאפליקציה בלבד — לעולם לא נכתבים ל-Google Calendar.</p>`;
+
+  document.getElementById("addWeeklyBlockBtn").addEventListener("click", () => openItemForm("weeklyBlock"));
+  container.querySelectorAll("tr.row-click").forEach((row) => {
+    const open = () => openItemForm("weeklyBlock", row.dataset.blockId);
+    row.addEventListener("click", open);
+    row.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+  });
+}
+
+let calendarSubView = "agenda"; // "agenda" | "manage"
+
 export function renderCalendarScreen() {
   const body = document.getElementById("calendarBody");
   if (!body) return;
@@ -418,16 +518,7 @@ export function renderCalendarScreen() {
     return;
   }
 
-  const evs = calGetEvents();
-  const groups = {};
-  evs.forEach((ev) => {
-    const day = (ev.start || "").slice(0, 10);
-    if (!day) return;
-    (groups[day] ||= []).push(ev);
-  });
-  const days = Object.keys(groups).sort();
   const last = calGetLastFetchedAt();
-
   body.innerHTML = `
     <div class="toolbar-row" style="justify-content:space-between;align-items:center">
       <span style="font-size:12px;color:var(--text-secondary)">
@@ -440,32 +531,23 @@ export function renderCalendarScreen() {
       </div>
     </div>
     ${err ? `<div class="field-error" style="margin-bottom:10px">${esc(err)}</div>` : ""}
-    ${
-      days.length
-        ? days
-            .map(
-              (day) => `
-        <div class="urgent-group">
-          <div class="ug-head" style="border-color:var(--accent-cal)">${esc(fmtDayLabel(day))}</div>
-          ${groups[day]
-            .map(
-              (ev) => `
-            <div class="urgent-item" style="cursor:default">
-              <span class="ui-name">${esc(ev.title)}</span>
-              <span class="ui-meta">${esc(fmtEventTime(ev))}</span>
-            </div>`
-            )
-            .join("")}
-        </div>`
-            )
-            .join("")
-        : `<div class="log-empty">אין אירועים בשבוע הקרוב ביומנים המסומנים</div>`
-    }
-    <p class="footer-note" style="margin-top:14px">קריאה בלבד — לעריכה, פותחים את Google Calendar</p>`;
+    <div class="store-tabs">
+      <button class="store-tab ${calendarSubView === "agenda" ? "active" : ""}" data-cal-tab="agenda">📅 השבוע</button>
+      <button class="store-tab ${calendarSubView === "manage" ? "active" : ""}" data-cal-tab="manage">🗓️ ניהול הלוח</button>
+    </div>
+    <div id="calendarSubBody"></div>
+    ${calendarSubView === "agenda" ? `<p class="footer-note" style="margin-top:14px">קריאה בלבד — לעריכה, פותחים את Google Calendar</p>` : ""}`;
 
   document.getElementById("calSettingsBtn").addEventListener("click", () => openCalendarSettingsForm());
   document.getElementById("calRefreshBtn").addEventListener("click", () => calFetchEvents());
   document.getElementById("calDisconnectBtn").addEventListener("click", () => disconnectCalendar());
+  document.querySelectorAll("[data-cal-tab]").forEach((btn) =>
+    btn.addEventListener("click", () => { calendarSubView = btn.dataset.calTab; renderCalendarScreen(); })
+  );
+
+  const sub = document.getElementById("calendarSubBody");
+  if (calendarSubView === "manage") renderCalendarManage(sub);
+  else renderCalendarAgenda(sub);
 }
 
 // ---- Finance (תצוגה מופשטת — לא טבלת נתונים גולמית) ----

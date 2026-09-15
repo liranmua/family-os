@@ -86,5 +86,9 @@ export function buildSeed() {
       { id: "UPD-001", entityType: "project", entityId: "PRJ-001", date: plusDays(-10), author: "לירן", note: "התחלנו לאסוף רעיונות ותמונות השראה לעיצוב החדר" },
       { id: "UPD-002", entityType: "task", entityId: "TSK-001", date: plusDays(-3), author: "לירן", note: "פנינו לשרברב אבל הוא לא היה זמין השבוע, מחפשים אחר" },
     ],
+    // לוח שבועי משפחתי (weeklyBlocks) — בכוונה בלי נתוני דוגמה: זו לא ישות שממחישים
+    // UX איתה, זה לוח שהמשתמש עצמו ממלא. הערה טכנית: גם אם היו כאן דוגמאות, הן לא
+    // היו מגיעות ל-Firestore דרך זרימת המיגרציה — weeklyBlocks היא ישות חדשה שאין
+    // לה נתונים היסטוריים ב-IndexedDB (db.js), ולכן במכוון לא נוספה שם כ-store.
   };
 }

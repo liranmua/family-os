@@ -38,6 +38,10 @@ export const SHOP_CATEGORY_OPTIONS = ["אוכל", "טואלטיקה", "ניקי�
 // (סבב 2) זיכרון פריטים חוזרים — לא חלק מהסבב הזה.
 export const SHOP_STORE_TYPES = ["סופר", "סופר-פארם", "בית-אחר"];
 
+// לוח שבועי משפחתי (Family_OS_Weekly_Schedule_Brief.md) — dayOfWeek הוא אינדקס במערך הזה,
+// באותה מוסכמה כמו Date.getDay() (0 = ראשון).
+export const DAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
 // ---- כלי עזר ----
 
 export function todayStr(d = new Date()) {

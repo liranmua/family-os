@@ -5,7 +5,7 @@ import { state, upsert, remove, saveFinance } from "./state.js";
 import {
   CATEGORY_LIST, ASSIGNABLE_NAMES, ALL_PEOPLE_NAMES, STATUS_LABEL, STATUS_CLASS, STATUS_ORDER,
   TYPE_META, PRIORITY_OPTIONS, FREQUENCY_OPTIONS, SHOP_STATUS_OPTIONS, SHOP_CATEGORY_OPTIONS, SHOP_STORE_TYPES,
-  optionList, formatDateDisplay, nextId, todayStr, esc, escAttr,
+  DAY_NAMES, optionList, formatDateDisplay, nextId, todayStr, esc, escAttr,
 } from "./constants.js";
 import { renderAll, projectProgress, subtaskProgress, getActiveStoreType } from "./render.js";
 import { showScreen } from "./nav.js";
@@ -554,9 +554,24 @@ function shoppingFormBody(s) {
     <div class="form-field"><label for="f-notes">הערות (לא חובה)</label><input type="text" id="f-notes" value="${escAttr(s.notes || "")}" placeholder="למשל: הסוג האורגני"></div>`;
 }
 
+function weeklyBlockFormBody(b) {
+  return `
+    <div class="form-field"><label for="f-name">כותרת <span class="req-hint">*</span></label><input type="text" id="f-name" required value="${escAttr(b.title || "")}"></div>
+    <div class="form-grid">
+      <div class="form-field"><label for="f-day">יום בשבוע</label><select id="f-day">${DAY_NAMES.map((d, i) => `<option value="${i}" ${i === (b.dayOfWeek ?? 0) ? "selected" : ""}>${d}</option>`).join("")}</select></div>
+      <div class="form-field"><label for="f-leader">מוביל <span class="req-hint">*</span></label><select id="f-leader">${optionList(ASSIGNABLE_NAMES, b.leader || ASSIGNABLE_NAMES[0])}</select></div>
+      <div class="form-field"><label for="f-start">שעת התחלה</label><input type="time" id="f-start" value="${escAttr(b.startTime || "")}"></div>
+      <div class="form-field"><label for="f-end">שעת סיום</label><input type="time" id="f-end" value="${escAttr(b.endTime || "")}"></div>
+      <div class="form-field"><label for="f-category">תחום (לא חובה)</label><select id="f-category"><option value="">—</option>${optionList(CATEGORY_LIST, b.category)}</select></div>
+    </div>
+    <div class="form-field"><label for="f-notes">הערות (לא חובה)</label><input type="text" id="f-notes" value="${escAttr(b.notes || "")}"></div>
+    <p style="font-size:11.5px;color:var(--text-secondary)">בלוק פנימי בלבד — לא נכתב ל-Google Calendar, רק מוצג יחד עם היומן האמיתי.</p>`;
+}
+
 const TITLES = {
   task: ["✏️ עריכת משימה", "+ משימה חדשה"],
   routine: ["✏️ עריכת שגרה", "+ שגרה יומית חדשה"],
+  weeklyBlock: ["✏️ עריכת בלוק שבועי", "+ בלוק שבועי"],
   project: ["✏️ עריכת פרויקט", "+ פרויקט חדש"],
   shopping: ["✏️ עריכת פריט קניות", "+ פריט קניות"],
 };
@@ -564,7 +579,7 @@ const TITLES = {
 export function openItemForm(kind, id = null) {
   let existing = null;
   if (id != null) {
-    const store = { task: "tasks", routine: "routines", project: "projects", shopping: "shopping" }[kind];
+    const store = { task: "tasks", routine: "routines", project: "projects", shopping: "shopping", weeklyBlock: "weeklyBlocks" }[kind];
     existing = state[store].find((x) => String(x.id) === String(id)) || null;
   }
   const src = existing || {};
@@ -572,6 +587,7 @@ export function openItemForm(kind, id = null) {
     kind === "task" ? taskFormBody(src)
     : kind === "routine" ? routineFormBody(src)
     : kind === "project" ? projectFormBody(src)
+    : kind === "weeklyBlock" ? weeklyBlockFormBody(src)
     : shoppingFormBody(src);
 
   openModal(formShell(TITLES[kind][existing ? 0 : 1], body, !!existing));
@@ -636,7 +652,7 @@ function wireDeleteButton(btn, kind, id) {
       timer = setTimeout(() => { armed = false; btn.textContent = "מחיקה"; }, 3000);
     } else {
       clearTimeout(timer);
-      await remove(kind === "task" ? "task" : kind === "routine" ? "routine" : kind === "project" ? "project" : "shopping", id);
+      await remove(kind, id); // kind כבר תואם למפתחות ה-entity ב-state.js (task/routine/project/shopping/weeklyBlock)
       closeModal();
       renderAll();
       showToast("נמחק");
@@ -738,6 +754,19 @@ async function saveFromForm(kind, existing) {
     };
     if (existing) obj.id = existing.id;
     await upsert("shopping", obj);
+  } else if (kind === "weeklyBlock") {
+    const obj = {
+      ...(existing || {}),
+      id: existing ? existing.id : nextId("WKB", state.weeklyBlocks.map((b) => b.id)),
+      title: name,
+      dayOfWeek: Number(val("f-day")),
+      startTime: val("f-start") || null,
+      endTime: val("f-end") || null,
+      leader: val("f-leader"),
+      category: val("f-category") || null,
+      notes: trimVal("f-notes") || null,
+    };
+    await upsert("weeklyBlock", obj);
   }
   return true;
 }
