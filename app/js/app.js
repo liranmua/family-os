@@ -83,11 +83,23 @@ function wireAuth() {
   document.getElementById("signOutBtn").addEventListener("click", () => signOutUser());
 }
 
-// ---- ניווט: Hub + חזרה + הגדרות ----
+// ---- ניווט: חזרה ----
 function wireNav() {
   document.querySelectorAll("[data-back]").forEach((b) => b.addEventListener("click", () => showScreen(b.dataset.back || "hub")));
-  const settingsBtn = document.getElementById("openSettingsBtn");
-  if (settingsBtn) settingsBtn.addEventListener("click", () => showScreen("settings"));
+}
+
+// ---- סרגל ניווט צדדי: מגירה בטלפון (המבורגר) / קבוע במסך רחב — אותו רכיב ----
+function wireSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const backdrop = document.getElementById("sidebarBackdrop");
+  const menuBtn = document.getElementById("menuBtn");
+  const closeBtn = document.getElementById("sidebarCloseBtn");
+  const open = () => { sidebar.classList.add("open"); backdrop.hidden = false; menuBtn.setAttribute("aria-expanded", "true"); };
+  const close = () => { sidebar.classList.remove("open"); backdrop.hidden = true; menuBtn.setAttribute("aria-expanded", "false"); };
+  menuBtn.addEventListener("click", open);
+  closeBtn.addEventListener("click", close);
+  backdrop.addEventListener("click", close);
+  sidebar.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => { showScreen(b.dataset.go); close(); }));
 }
 
 // ---- חיפוש משימות (מחווט פעם אחת — כדי לא לאבד פוקוס תוך כדי הקלדה) ----
@@ -215,6 +227,7 @@ async function main() {
   setRoutineToggleHandler(toggleRoutineToday);
 
   wireNav();
+  wireSidebar();
   wireButtons();
   wireTaskSearch();
   wireOverlay();

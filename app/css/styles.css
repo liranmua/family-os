@@ -96,54 +96,49 @@ header .sub { font-size: 12.5px; opacity: .75; margin-top: 3px; }
 }
 .back-btn:hover { background: #FAF9F6; }
 
-/* ---- Hub: רצועת "היום" ---- */
-.glance-card {
-  background: var(--bg-card); border-radius: var(--radius); padding: 14px 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: var(--gap);
-  display: flex; flex-direction: column; gap: 2px;
-}
+/* ---- בית: תווית "היום" (משותפת עם pill-* למטה) ---- */
 .glance-title { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 6px; }
-.glance-row {
-  display: flex; align-items: center; gap: 9px; padding: 8px 4px; font-size: 14px;
-  cursor: pointer; border-radius: 8px; border: none; background: none; width: 100%;
-  text-align: right; font-family: inherit; color: var(--text-primary);
-}
-.glance-row:hover { background: #FAF9F6; }
-.glance-row .gi { width: 20px; text-align: center; flex-shrink: 0; }
-.glance-row .pill { margin-inline-start: auto; flex-shrink: 0; }
 .pill { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
 .pill-bad { background: rgba(214,69,69,.14); color: #9a2b2b; }
 .pill-warn { background: rgba(217,142,4,.16); color: #7a5200; }
 .pill-ok { background: rgba(47,158,88,.15); color: #1f6b3b; }
 .pill-mut { background: rgba(154,160,166,.18); color: var(--text-secondary); }
 
-/* ---- Hub: רשת אזורים ---- */
-.tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: var(--gap); }
-.tile {
-  background: var(--bg-card); border-radius: var(--radius); padding: 16px 16px 15px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.06); border-inline-start: 5px solid var(--tc, var(--accent-fin));
-  border-block: none; border-inline-end: none; text-align: right; cursor: pointer;
-  font-family: inherit; display: flex; flex-direction: column; gap: 5px; min-height: 84px;
-}
-.tile:hover { box-shadow: 0 2px 8px rgba(0,0,0,.09); }
-.tile:focus-visible { outline: 2px solid var(--accent-fin); outline-offset: 2px; }
-.tile-name { font-size: 15px; font-weight: 700; }
-.tile-sub { font-size: 12px; color: var(--text-secondary); margin-top: auto; }
-.tc-tasks { --tc: var(--accent-fin); }
-.tc-shop { --tc: var(--accent-shop); }
-.tc-cal { --tc: var(--accent-cal); }
-.tc-fin { --tc: var(--accent-proj); }
-.tc-proj { --tc: var(--accent-kids); }
-.tc-routine { --tc: var(--accent-home); }
-
-.hub-footer { text-align: center; margin-top: 4px; }
-.link-btn {
-  background: none; border: none; color: var(--text-secondary); font-size: 13px;
-  font-family: inherit; cursor: pointer; padding: 8px; text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.link-btn:hover { color: var(--text-primary); }
 .settings-sub { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px; }
+
+/* ---- סרגל ניווט צדדי (Sidebar/Drawer) ----
+   רכיב רספונסיבי אחד: מגירה קבועה-מיקום (fixed) בטלפון, נפתחת/נסגרת עם .open;
+   קבוע/גלוי תמיד (sticky, בתוך flex) במסך רחב — ראו @media (min-width:860px) למטה. */
+.app-shell { position: relative; }
+.sidebar {
+  position: fixed; inset-block: 0; inset-inline-start: 0; width: 260px; max-width: 82vw;
+  background: var(--bg-card); box-shadow: -2px 0 16px rgba(0,0,0,.14);
+  padding: 18px 16px; display: flex; flex-direction: column; gap: 3px;
+  transform: translateX(100%); transition: transform .22s ease-out; z-index: 80; overflow-y: auto;
+}
+.sidebar.open { transform: translateX(0); }
+.sidebar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sidebar-title { font-size: 15px; font-weight: 700; }
+.sidebar-close { background: none; border: none; font-size: 18px; color: var(--text-secondary); cursor: pointer; padding: 4px; font-family: inherit; }
+.sidebar-link {
+  display: block; width: 100%; text-align: right; font-family: inherit;
+  background: none; border: none; border-radius: 8px; padding: 10px 10px; font-size: 14px; font-weight: 600;
+  color: var(--text-primary); cursor: pointer;
+}
+.sidebar-link:hover { background: #FAF9F6; }
+.sidebar-link.active { background: rgba(76,114,176,.1); color: var(--accent-fin); }
+.sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 75; }
+.sidebar-backdrop[hidden] { display: none; }
+
+@media (min-width: 860px) {
+  .app-shell { display: flex; align-items: flex-start; gap: var(--gap); }
+  .app-main { flex: 1; min-width: 0; }
+  .sidebar {
+    position: sticky; top: var(--gap); inset-block: auto; width: 200px; max-width: none;
+    height: fit-content; transform: none; box-shadow: 0 1px 3px rgba(0,0,0,.06); z-index: 1;
+  }
+  .sidebar-backdrop, .sidebar-close, #menuBtn { display: none; }
+}
 
 /* ---- פרויקטים: כרטיס לחיץ (drill-in) ---- */
 .card.row-click { cursor: pointer; }
@@ -198,11 +193,6 @@ header .sub { font-size: 12.5px; opacity: .75; margin-top: 3px; }
 .block-badge {
   display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
   background: rgba(154,160,166,.18); color: var(--text-secondary); margin-inline-start: 6px; white-space: nowrap;
-}
-
-@media (max-width: 480px) {
-  .tiles { grid-template-columns: 1fr 1fr; gap: 10px; }
-  .tile { padding: 13px 13px 12px; min-height: 74px; }
 }
 
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--gap); }

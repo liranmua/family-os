@@ -1,7 +1,7 @@
 // Family OS — Service Worker. app-shell cache ל-offline + טיפול בלחיצה על התראה.
 // שלב 1: אין Push-שרת. ה-SW רק מגיש את הקבצים ומרכז את showNotification.
 
-const CACHE = "family-os-v11";
+const CACHE = "family-os-v12";
 const SHELL = [
   "./",
   "./index.html",

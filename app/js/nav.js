@@ -8,6 +8,7 @@ export function showScreen(name) {
     const el = document.getElementById("screen-" + s);
     if (el) el.hidden = s !== name;
   });
+  document.querySelectorAll(".sidebar-link").forEach((b) => b.classList.toggle("active", b.dataset.go === name));
   window.scrollTo(0, 0);
 }
 

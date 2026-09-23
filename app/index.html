@@ -18,6 +18,7 @@
       <div class="sub" id="storageLine">טוען…</div>
     </div>
     <div class="header-actions">
+      <button class="hbtn" id="menuBtn" aria-label="תפריט" aria-expanded="false">☰ תפריט</button>
       <div class="auth-box" id="authBox">
         <button class="hbtn" id="signInBtn">🔑 התחבר עם Google</button>
         <div class="auth-user" id="authUser" hidden>
@@ -36,75 +37,94 @@
     <button id="enableNotifBtn">אפשר התראות</button>
   </div>
 
-  <!-- ===== HUB (מסך ראשי) ===== -->
-  <div class="screen" id="screen-hub">
-    <div class="glance-card" id="todayGlance"></div>
-    <div class="tiles" id="hubTiles"></div>
-    <div class="hub-footer"><button class="link-btn" id="openSettingsBtn">⚙️ הגדרות · בני המשפחה</button></div>
-  </div>
+  <div class="app-shell">
+    <nav class="sidebar" id="sidebar" aria-label="ניווט ראשי">
+      <div class="sidebar-head">
+        <span class="sidebar-title">🏠 Family OS</span>
+        <button class="sidebar-close" id="sidebarCloseBtn" aria-label="סגירת תפריט">✕</button>
+      </div>
+      <button class="sidebar-link active" data-go="hub">🏡 בית</button>
+      <button class="sidebar-link" data-go="tasks">✅ משימות</button>
+      <button class="sidebar-link" data-go="shopping">🛒 קניות</button>
+      <button class="sidebar-link" data-go="calendar">📅 יומן</button>
+      <button class="sidebar-link" data-go="finance">💰 פיננסים</button>
+      <button class="sidebar-link" data-go="projects">🧩 פרויקטים</button>
+      <button class="sidebar-link" data-go="routines">🔁 שגרות</button>
+      <button class="sidebar-link" data-go="settings">⚙️ הגדרות</button>
+    </nav>
+    <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
 
-  <!-- ===== משימות ===== -->
-  <div class="screen" id="screen-tasks" hidden>
-    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>✅ משימות</h2></div>
-    <div id="tasksDashboard"></div>
-    <div class="task-toolbar">
-      <input type="search" id="taskSearchInput" placeholder="🔍 חיפוש משימה…" class="search-input">
-      <div class="filters" id="filtersTasks"></div>
-    </div>
-    <div class="toolbar-row"><button class="btn-primary" id="addTaskBtn">+ משימה חדשה</button></div>
-    <div class="table-wrap"><table id="tasksTable"></table></div>
-  </div>
+    <main class="app-main">
+      <!-- ===== בית (מסך ראשי) — תמונת-יום מאוחדת ===== -->
+      <div class="screen" id="screen-hub">
+        <div class="glance-title">היום</div>
+        <div class="urgent-groups" id="homeAgenda"></div>
+      </div>
 
-  <!-- ===== שגרות ===== -->
-  <div class="screen" id="screen-routines" hidden>
-    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>🔁 שגרות יומיות</h2></div>
-    <div class="filters" id="filtersRoutines"></div>
-    <div class="toolbar-row"><button class="btn-primary" id="addRoutineBtn">+ שגרה חדשה</button></div>
-    <div class="routines-grid" id="routinesGrid"></div>
-  </div>
+      <!-- ===== משימות ===== -->
+      <div class="screen" id="screen-tasks" hidden>
+        <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>✅ משימות</h2></div>
+        <div id="tasksDashboard"></div>
+        <div class="task-toolbar">
+          <input type="search" id="taskSearchInput" placeholder="🔍 חיפוש משימה…" class="search-input">
+          <div class="filters" id="filtersTasks"></div>
+        </div>
+        <div class="toolbar-row"><button class="btn-primary" id="addTaskBtn">+ משימה חדשה</button></div>
+        <div class="table-wrap"><table id="tasksTable"></table></div>
+      </div>
 
-  <!-- ===== קניות ===== -->
-  <div class="screen" id="screen-shopping" hidden>
-    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>🛒 רשימת קניות</h2></div>
-    <div class="store-tabs" id="storeTabs"></div>
-    <div class="shop-subtotal" id="shopSubtotal"></div>
-    <div class="toolbar-row"><button class="btn-primary" id="addShopBtn">+ פריט קניות</button></div>
-    <div class="table-wrap"><table id="shopTable"></table></div>
-  </div>
+      <!-- ===== שגרות ===== -->
+      <div class="screen" id="screen-routines" hidden>
+        <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>🔁 שגרות יומיות</h2></div>
+        <div class="filters" id="filtersRoutines"></div>
+        <div class="toolbar-row"><button class="btn-primary" id="addRoutineBtn">+ שגרה חדשה</button></div>
+        <div class="routines-grid" id="routinesGrid"></div>
+      </div>
 
-  <!-- ===== פיננסים ===== -->
-  <div class="screen" id="screen-finance" hidden>
-    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>💰 פיננסים</h2></div>
-    <div class="finance-card" id="financeCard"></div>
-  </div>
+      <!-- ===== קניות ===== -->
+      <div class="screen" id="screen-shopping" hidden>
+        <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>🛒 רשימת קניות</h2></div>
+        <div class="store-tabs" id="storeTabs"></div>
+        <div class="shop-subtotal" id="shopSubtotal"></div>
+        <div class="toolbar-row"><button class="btn-primary" id="addShopBtn">+ פריט קניות</button></div>
+        <div class="table-wrap"><table id="shopTable"></table></div>
+      </div>
 
-  <!-- ===== פרויקטים ===== -->
-  <div class="screen" id="screen-projects" hidden>
-    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>🧩 פרויקטים</h2></div>
-    <div class="filters" id="filtersProjects"></div>
-    <div class="cards" id="projectsCards"></div>
-  </div>
+      <!-- ===== פיננסים ===== -->
+      <div class="screen" id="screen-finance" hidden>
+        <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>💰 פיננסים</h2></div>
+        <div class="finance-card" id="financeCard"></div>
+      </div>
 
-  <!-- ===== פרויקט בודד (drill-in) ===== -->
-  <div class="screen" id="screen-project-detail" hidden>
-    <div class="screen-head"><button class="back-btn" data-back="projects">‹ חזרה</button><h2 id="pdTitle">🧩</h2></div>
-    <div id="projectDetailBody"></div>
-  </div>
+      <!-- ===== פרויקטים ===== -->
+      <div class="screen" id="screen-projects" hidden>
+        <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>🧩 פרויקטים</h2></div>
+        <div class="filters" id="filtersProjects"></div>
+        <div class="cards" id="projectsCards"></div>
+      </div>
 
-  <!-- ===== יומן (קריאה בלבד, של לירן בלבד בשלב זה) ===== -->
-  <div class="screen" id="screen-calendar" hidden>
-    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>📅 יומן</h2></div>
-    <div id="calendarBody"></div>
-  </div>
+      <!-- ===== פרויקט בודד (drill-in) ===== -->
+      <div class="screen" id="screen-project-detail" hidden>
+        <div class="screen-head"><button class="back-btn" data-back="projects">‹ חזרה</button><h2 id="pdTitle">🧩</h2></div>
+        <div id="projectDetailBody"></div>
+      </div>
 
-  <!-- ===== הגדרות ===== -->
-  <div class="screen" id="screen-settings" hidden>
-    <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>⚙️ הגדרות</h2></div>
-    <h3 class="settings-sub">בני המשפחה</h3>
-    <div class="people-grid" id="peopleGrid"></div>
-  </div>
+      <!-- ===== יומן (קריאה בלבד, של לירן בלבד בשלב זה) ===== -->
+      <div class="screen" id="screen-calendar" hidden>
+        <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>📅 יומן</h2></div>
+        <div id="calendarBody"></div>
+      </div>
 
-  <p class="footer-note">Family OS · מתפתח מ-family_hub_dashboard.html</p>
+      <!-- ===== הגדרות ===== -->
+      <div class="screen" id="screen-settings" hidden>
+        <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>⚙️ הגדרות</h2></div>
+        <h3 class="settings-sub">בני המשפחה</h3>
+        <div class="people-grid" id="peopleGrid"></div>
+      </div>
+
+      <p class="footer-note">Family OS · מתפתח מ-family_hub_dashboard.html</p>
+    </main>
+  </div>
 </div>
 
 <div class="modal-overlay" id="modalOverlay" hidden>

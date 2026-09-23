@@ -3,7 +3,7 @@
 
 import { state } from "./state.js";
 import {
-  CATEGORY_COLOR, PEOPLE, STATUS_LABEL, STATUS_CLASS, TYPE_META, SHOP_STORE_TYPES, DAY_NAMES,
+  CATEGORY_COLOR, PEOPLE, ASSIGNABLE_NAMES, EMAIL_TO_NAME, STATUS_LABEL, STATUS_CLASS, TYPE_META, SHOP_STORE_TYPES, DAY_NAMES,
   formatDateDisplay, todayStr, esc,
 } from "./constants.js";
 import {
@@ -11,6 +11,7 @@ import {
   openProjectDetail, refreshProjectDetailIfOpen, openCalendarSettingsForm,
 } from "./forms.js";
 import { showScreen } from "./nav.js";
+import { currentUser } from "./auth.js";
 import {
   isConnected as calIsConnected, getEvents as calGetEvents, getLastFetchedAt as calGetLastFetchedAt,
   getLastError as calGetLastError, connectCalendar, fetchEvents as calFetchEvents, disconnectCalendar,
@@ -45,72 +46,87 @@ export function todaysCompletion(routineId) {
 
 // ---- KPIs ----
 
-// ---- Hub (מסך ראשי): רצועת "היום" + רשת אזורים ----
+// ---- Home (מסך ראשי): תמונת-יום מאוחדת אחת, כרונולוגית ----
+// ממזגת 3 מקורות: אירועי Google Calendar אמיתיים (של היום) + בלוקים מהלוח השבועי הפנימי
+// (חלים על היום, לפי dayOfWeek) + משימות דחופות (אותה לוגיקה בדיוק כמו renderTasksDashboard).
+// הרחבה של אותו רעיון מיזוג כמו renderCalendarAgenda — רק חלון "היום" בלבד, ומקור שלישי (משימות).
+// לחיצה על פריט מנווטת למסך האזור הרלוונטי, לא פותחת עריכה/מודאל מהבית.
+
+// המשתמש המחובר -> שם מוכר ("לירן"/"מורן"), לצורך סדר עדיפות אישי. null אם לא ידוע/לא מחובר.
+function currentPersonName() {
+  const u = currentUser();
+  if (!u || !u.email) return null;
+  return EMAIL_TO_NAME[u.email] || null;
+}
+function otherPersonName(me) {
+  return ASSIGNABLE_NAMES.find((n) => n !== me) || null;
+}
+
+function homeGroupHtml(title, items) {
+  if (!items.length) return "";
+  const sorted = [...items].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  return `
+    <div class="urgent-group">
+      <div class="ug-head">${esc(title)}</div>
+      ${sorted
+        .map(
+          (it) => `
+        <button class="urgent-item" data-go="${it.go}">
+          <span class="ui-name">${esc(it.title)}${it.tag ? `<span class="block-badge">${esc(it.tag)}</span>` : ""}</span>
+          <span class="ui-meta">${esc(it.time)}</span>
+        </button>`
+        )
+        .join("")}
+    </div>`;
+}
 
 export function renderHub() {
-  const glanceEl = document.getElementById("todayGlance");
-  const tilesEl = document.getElementById("hubTiles");
-  if (!glanceEl || !tilesEl) return;
+  const el = document.getElementById("homeAgenda");
+  if (!el) return;
 
   const today = todayStr();
+  const dow = new Date().getDay();
+  const me = currentPersonName();
+
+  // מקור 1: אירועי יומן אמיתיים של היום — מוצג רק היומן של הצופה עצמו, אז תמיד "שלו".
+  const events = calIsConnected()
+    ? calGetEvents()
+        .filter((ev) => (ev.start || "").slice(0, 10) === today)
+        .map((ev) => ({ sortKey: fmtEventTime(ev) === "כל היום" ? "00:00" : (ev.start || "").slice(11, 16) || "00:00", time: fmtEventTime(ev), title: ev.title, go: "calendar", owner: me }))
+    : [];
+
+  // מקור 2: בלוקים מהלוח השבועי הפנימי שחלים היום (לעולם לא נכתבים ל-Google — ראו renderCalendarAgenda).
+  const blocks = state.weeklyBlocks
+    .filter((b) => b.dayOfWeek === dow)
+    .map((b) => ({
+      sortKey: b.startTime || "00:00",
+      time: [b.startTime, b.endTime].filter(Boolean).join("–") || "כל היום",
+      title: b.title, go: "calendar", owner: b.leader, tag: "🏠 פנימי",
+    }));
+
+  // מקור 3: משימות דחופות — אותה לוגיקה בדיוק כמו renderTasksDashboard (לא הגדרה חדשה).
   const openTasks = state.tasks.filter((t) => t.status !== "done");
-  const overdue = openTasks.filter((t) => t.dueDate && t.dueDate < today);
-  const activeProjects = state.projects.filter((p) => p.status !== "done");
-  const shortShopping = state.shopping.filter((s) => s.status !== "במלאי");
-  const activeRoutines = state.routines.filter((r) => r.active);
-  const routinesDoneToday = activeRoutines.filter((r) => {
-    const c = todaysCompletion(r.id);
-    return c && c.done;
-  }).length;
-  const f = state.finance || {};
-  const budgetLbl = f.budgetFree != null ? `₪${Number(f.budgetFree).toLocaleString("he-IL")}` : "—";
-  const goalLbl = f.savingsGoalPct != null ? `${f.savingsGoalPct}%` : "—";
+  const tasks = openTasks
+    .filter((t) => (t.dueDate && t.dueDate <= today) || t.priority === "דחוף")
+    .map((t) => ({
+      sortKey: t.dueTime || "00:00",
+      time: t.dueTime || (t.dueDate && t.dueDate < today ? "באיחור" : "ללא שעה"),
+      title: t.name, go: "tasks", owner: t.owner, tag: "✅ משימה",
+    }));
 
-  const calConnected = calIsConnected();
-  const calTodayCount = calGetEvents().filter((ev) => (ev.start || "").slice(0, 10) === today).length;
-  const calGlancePill = calConnected
-    ? `<span class="pill pill-mut">${calTodayCount} היום</span>`
-    : `<span class="pill pill-warn">לא מחובר</span>`;
-  const calTileSub = calConnected ? `${calTodayCount} אירועים היום` : "לא מחובר — הקישו לחיבור";
+  const all = [...events, ...blocks, ...tasks];
+  let html;
+  if (me) {
+    const otherName = otherPersonName(me);
+    const mine = all.filter((it) => it.owner === me || it.go === "calendar");
+    const theirs = otherName ? all.filter((it) => it.owner === otherName) : [];
+    html = homeGroupHtml("שלך היום", mine) + (theirs.length ? homeGroupHtml(`גם היום אצל ${otherName}`, theirs) : "");
+  } else {
+    html = homeGroupHtml("היום", all);
+  }
 
-  glanceEl.innerHTML = `
-    <div class="glance-title">היום</div>
-    <button class="glance-row" data-go="tasks">
-      <span class="gi">✅</span><span>${openTasks.length} משימות פתוחות</span>
-      ${overdue.length ? `<span class="pill pill-bad">${overdue.length} באיחור</span>` : ""}
-    </button>
-    <button class="glance-row" data-go="routines">
-      <span class="gi">🔁</span><span>שגרות היום</span>
-      <span class="pill ${activeRoutines.length && routinesDoneToday === activeRoutines.length ? "pill-ok" : "pill-warn"}">${routinesDoneToday}/${activeRoutines.length}</span>
-    </button>
-    <button class="glance-row" data-go="calendar">
-      <span class="gi">📅</span><span>יומן</span>
-      ${calGlancePill}
-    </button>
-    <button class="glance-row" data-go="shopping">
-      <span class="gi">🛒</span><span>רשימת קניות</span>
-      <span class="pill pill-mut">${shortShopping.length} חסרים</span>
-    </button>`;
-
-  const tiles = [
-    { key: "tasks", cls: "tc-tasks", icon: "✅", name: "משימות", sub: `${openTasks.length} פתוחות${overdue.length ? ` · ${overdue.length} באיחור` : ""}` },
-    { key: "shopping", cls: "tc-shop", icon: "🛒", name: "קניות", sub: `${shortShopping.length} חסרים` },
-    { key: "calendar", cls: "tc-cal", icon: "📅", name: "יומן", sub: calTileSub },
-    { key: "finance", cls: "tc-fin", icon: "💰", name: "פיננסים", sub: `פנוי ${budgetLbl} · יעד ${goalLbl}` },
-    { key: "projects", cls: "tc-proj", icon: "🧩", name: "פרויקטים", sub: `${activeProjects.length} פעילים` },
-    { key: "routines", cls: "tc-routine", icon: "🔁", name: "שגרות", sub: `${activeRoutines.length} פעילות · ${routinesDoneToday}/${activeRoutines.length} היום` },
-  ];
-  tilesEl.innerHTML = tiles
-    .map((t) => `
-      <button class="tile ${t.cls}" data-go="${t.key}">
-        <div class="tile-name">${t.icon} ${esc(t.name)}</div>
-        <div class="tile-sub">${esc(t.sub)}</div>
-      </button>`)
-    .join("");
-
-  [...glanceEl.querySelectorAll("[data-go]"), ...tilesEl.querySelectorAll("[data-go]")].forEach((el) =>
-    el.addEventListener("click", () => showScreen(el.dataset.go))
-  );
+  el.innerHTML = html || `<div class="log-empty">אין כלום מיוחד היום 🎉</div>`;
+  el.querySelectorAll("[data-go]").forEach((btn) => btn.addEventListener("click", () => showScreen(btn.dataset.go)));
 }
 
 // ---- Projects ----

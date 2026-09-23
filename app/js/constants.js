@@ -21,6 +21,12 @@ export const PEOPLE = [
 export const ASSIGNABLE_NAMES = PEOPLE.filter((p) => p.assignable).map((p) => p.name);
 export const ALL_PEOPLE_NAMES = PEOPLE.map((p) => p.name);
 
+// מיפוי מייל Google -> שם מוכר במערכת, לצורך התאמה אישית במסך הבית ("שדה מוביל מול מי מחובר").
+// כרגע ידוע רק המייל של לירן; מייל מורן ייתווסף כשתתחבר (ראו CLAUDE.md — עדיין מושהה במכוון).
+export const EMAIL_TO_NAME = {
+  "liranmua@gmail.com": "לירן",
+};
+
 export const STATUS_LABEL = { todo: "טרם התחיל", progress: "בביצוע", waiting: "ממתין", done: "הושלם" };
 export const STATUS_CLASS = { todo: "status-todo", progress: "status-progress", waiting: "status-waiting", done: "status-done" };
 export const STATUS_ORDER = ["todo", "progress", "waiting", "done"];
