@@ -1,124 +1,123 @@
-// Family OS — התראות מקומיות בלבד (שלב 1).
-// לא Push-שרת. התזכורות נבדקות בטעינת האפליקציה וכל 60 שניות בזמן שהיא פתוחה/ברקע.
-// כשנתמך — נרשם גם TimestampTrigger כדי שהתראה תופיע גם אם הטאב נסגר (Chrome).
+// Family OS — התראות פנימיות (סבב 1, ראו Family_OS_Notifications_Brief.md).
+// toast בתוך הדף בלבד — לא הרשאת דפדפן, לא באנר מערכת הפעלה. פעיל רק כשהאפליקציה פתוחה.
+// שלושה טריגרים: בלוק שבועי מתקרב (15 דק' לפני), משימה עם יעד מתקרב (שעה לפני / בוקר יום
+// היעד אם אין שעה), פריט קניות שנוסף ע"י מכשיר אחר. סבב 2 (Push אמיתי דרך FCM) נפרד ובא אח"כ.
 
 import { state, getMeta, setMeta } from "./state.js";
-import { formatDateDisplay } from "./constants.js";
+import { deviceLabel } from "./cloud.js";
+import { formatDateDisplay, todayStr } from "./constants.js";
 
 const CHECK_INTERVAL_MS = 60 * 1000;
-// חלון התראה: משימה עם dueTime — כשמגיע הזמן (עד 15 דק' אחרי). משימה עם תאריך בלבד —
-// מ-08:00 באותו יום, וגם תזכורת מקדימה יום לפני מ-18:00.
-const LEAD_MIN_BEFORE_DATED = 0;
+const BLOCK_LEAD_MIN = 15;
+const TASK_LEAD_MIN = 60;
 
-let swReg = null;
-let notifiedIds = new Set();
+let firedKeys = new Set();
+let seenShoppingIds = null; // null = טרם אותחל (בעליה ראשונה לא מתריעים על מה שכבר קיים)
+let onToast = () => {};
 let timer = null;
+// checkAll() נקרא גם מ-onStateChange בכל עדכון Firestore — כולל לפני שה-meta המקומי
+// (firedKeys/seenShoppingIds) נטען בפועל מ-IndexedDB (שני האזנות אסינכרוניות עצמאיות,
+// בלי ערובה לסדר). בלי השומר הזה, בדיקה שרצה לפני שה-meta נטען הייתה "רואה" את כל
+// הפריטים הקיימים כחדשים ומתריעה עליהם בטעות בכל טעינה מחדש.
+let ready = false;
 
-export async function initNotifications(registration) {
-  swReg = registration || null;
-  const saved = await getMeta("notifiedIds", []);
-  notifiedIds = new Set(saved);
-  refreshNoticeBar();
+export function setToastHandler(fn) { onToast = fn; }
+
+export async function initNotifications() {
+  firedKeys = new Set(await getMeta("notifFiredKeys", []));
+  const savedSeen = await getMeta("notifShoppingSeenIds", null);
+  seenShoppingIds = savedSeen ? new Set(savedSeen) : null;
+  ready = true;
   startLoop();
 }
 
 export function startLoop() {
   stopLoop();
-  checkDueItems();
-  timer = setInterval(checkDueItems, CHECK_INTERVAL_MS);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") checkDueItems();
-  });
+  checkAll();
+  timer = setInterval(checkAll, CHECK_INTERVAL_MS);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkAll(); });
 }
 export function stopLoop() {
   if (timer) clearInterval(timer);
   timer = null;
 }
 
-export function refreshNoticeBar() {
-  const bar = document.getElementById("notifNotice");
-  if (!bar) return;
-  const supported = "Notification" in window;
-  bar.hidden = !supported || Notification.permission === "granted" || Notification.permission === "denied";
+function fireOnce(key, title, body) {
+  if (firedKeys.has(key)) return;
+  firedKeys.add(key);
+  onToast(title, body);
 }
 
-export async function requestPermission() {
-  if (!("Notification" in window)) return "unsupported";
-  let perm = Notification.permission;
-  if (perm === "default") perm = await Notification.requestPermission();
-  await setMeta("notifPermissionAsked", true);
-  refreshNoticeBar();
-  if (perm === "granted") {
-    fire("Family OS", { body: "התראות מופעלות. נזכיר לך על משימות עם תאריך יעד קרוב." });
-    checkDueItems();
-  }
-  return perm;
-}
-
-function due(task) {
-  // מחזיר {when: Date, key} לרגע שבו צריך להתריע, או null.
-  if (!task.dueDate && !task.dueTime) return null;
+function checkWeeklyBlocks() {
   const now = new Date();
-  if (task.dueDate) {
-    const [y, m, d] = task.dueDate.split("-").map(Number);
-    if (task.dueTime) {
-      const [hh, mm] = task.dueTime.split(":").map(Number);
-      // חלון קצר: תזכורת בזמן, ועד 3 שעות אחרי
-      return { when: new Date(y, m - 1, d, hh, mm), key: `${task.id}@due`, windowMs: 3 * 3600 * 1000 };
-    }
-    // תאריך בלבד: תזכורת ביום עצמו ב-08:00 (עד סוף היום), ותזכורת מקדימה יום לפני ב-18:00
-    const dayOf = new Date(y, m - 1, d, 8, 0);
-    const dayBefore = new Date(y, m - 1, d - 1, 18, 0);
-    if (now >= dayOf) return { when: dayOf, key: `${task.id}@dayof`, windowMs: 36 * 3600 * 1000 };
-    if (now >= dayBefore) return { when: dayBefore, key: `${task.id}@lead`, windowMs: 20 * 3600 * 1000 };
-    return { when: dayBefore, key: `${task.id}@lead`, future: true };
-  }
-  // שעה בלבד (בלי תאריך) — לא מתריעים אוטומטית, אין יום ברור
-  return null;
-}
-
-export async function checkDueItems() {
-  if (!("Notification" in window) || Notification.permission !== "granted") return;
-  const now = Date.now();
-  let changed = false;
-
-  for (const t of state.tasks) {
-    if (t.status === "done") continue;
-    const info = due(t);
-    if (!info || info.future) continue;
-    const overdueMs = now - info.when.getTime();
-    // מתריעים אם עברנו את הזמן אבל עדיין בתוך חלון ההתראה (כדי לא להציף בהיסטוריה)
-    if (overdueMs < 0 || overdueMs > (info.windowMs || 12 * 3600 * 1000)) continue;
-    if (notifiedIds.has(info.key)) continue;
-
-    const dateLbl = [formatDateDisplay(t.dueDate), t.dueTime].filter(Boolean).join(" · ");
-    fire(`תזכורת: ${t.name}`, {
-      body: `${t.owner} · ${t.category}${dateLbl ? ` · ${dateLbl}` : ""}`,
-      tag: info.key,
-      data: { taskId: t.id },
+  const today = todayStr(now);
+  state.weeklyBlocks
+    .filter((b) => b.dayOfWeek === now.getDay() && b.startTime)
+    .forEach((b) => {
+      const [hh, mm] = b.startTime.split(":").map(Number);
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm);
+      const lead = new Date(start.getTime() - BLOCK_LEAD_MIN * 60000);
+      if (now >= lead && now <= start) {
+        fireOnce(`block@${b.id}@${today}`, `בעוד ${BLOCK_LEAD_MIN} דק': ${b.title}`, `${b.leader}${b.category ? " · " + b.category : ""}`);
+      }
     });
-    notifiedIds.add(info.key);
-    changed = true;
-  }
-
-  // ניקוי מפתחות של משימות שכבר לא קיימות
-  const liveKeys = new Set();
-  state.tasks.forEach((t) => ["due", "dayof", "lead"].forEach((s) => liveKeys.add(`${t.id}@${s}`)));
-  for (const k of [...notifiedIds]) if (!liveKeys.has(k)) { notifiedIds.delete(k); changed = true; }
-
-  if (changed) await setMeta("notifiedIds", [...notifiedIds]);
 }
 
-function fire(title, opts) {
-  const options = { icon: "icons/icon-192.png", badge: "icons/icon-192.png", ...opts };
-  try {
-    if (swReg && swReg.showNotification) swReg.showNotification(title, options);
-    else new Notification(title, options);
-  } catch (e) {
-    try { new Notification(title, options); } catch (_) {}
+function checkTasks() {
+  const now = new Date();
+  const today = todayStr(now);
+  state.tasks.forEach((t) => {
+    if (t.status === "done" || !t.dueDate) return;
+    if (t.dueTime) {
+      const [y, m, d] = t.dueDate.split("-").map(Number);
+      const [hh, mm] = t.dueTime.split(":").map(Number);
+      const due = new Date(y, m - 1, d, hh, mm);
+      const lead = new Date(due.getTime() - TASK_LEAD_MIN * 60000);
+      if (now >= lead && now <= due) {
+        fireOnce(`task@${t.id}@${t.dueDate}@${t.dueTime}`, `בעוד שעה: ${t.name}`, `${t.owner} · ${formatDateDisplay(t.dueDate)} ${t.dueTime}`);
+      }
+    } else if (t.dueDate === today) {
+      const morning = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0);
+      if (now >= morning) {
+        fireOnce(`task@${t.id}@${t.dueDate}@morning`, `היום: ${t.name}`, `${t.owner} · ${t.category}`);
+      }
+    }
+  });
+}
+
+function checkShopping() {
+  if (seenShoppingIds === null) {
+    // בעליה ראשונה: "רואים" את מה שכבר קיים בלי להתריע עליו רטרואקטיבית.
+    seenShoppingIds = new Set(state.shopping.map((s) => s.id));
+    return;
   }
+  const me = deviceLabel();
+  state.shopping.forEach((s) => {
+    if (seenShoppingIds.has(s.id)) return;
+    seenShoppingIds.add(s.id);
+    if (s.addedBy && s.addedBy !== me) {
+      onToast("נוסף פריט לקניות", `${s.name}${s.storeType ? " · " + s.storeType : ""}`);
+    }
+  });
+}
+
+// שרשור לכתיבות meta כדי שלא ידרסו זו את זו: checkAll יכול לרוץ כמה פעמים ברצף מהיר
+// (כל שינוי state), וכתיבת IndexedDB אסינכרונית בלי שרשור עלולה להסתיים מחוץ לסדר,
+// והכי-אחרונה-שהתחילה (עם סט קטן/ישן יותר) יכולה לדרוס כתיבה מאוחרת יותר בפועל.
+let persistTail = Promise.resolve();
+function persist(key, value) {
+  persistTail = persistTail.then(() => setMeta(key, value)).catch(() => {});
+}
+
+export function checkAll() {
+  if (!ready) return;
+  const before = firedKeys.size;
+  checkWeeklyBlocks();
+  checkTasks();
+  checkShopping();
+  if (firedKeys.size !== before) persist("notifFiredKeys", [...firedKeys]);
+  if (seenShoppingIds) persist("notifShoppingSeenIds", [...seenShoppingIds]);
 }
 
 // לבדיקה ידנית מה-console: window.__familyosNotifyTest()
-window.__familyosNotifyTest = () =>
-  fire("בדיקת התראה — Family OS", { body: "אם אתה רואה את זה, ההתראות עובדות." });
+window.__familyosNotifyTest = () => onToast("בדיקת התראה — Family OS", "אם אתה רואה את זה, ההתראות עובדות.");

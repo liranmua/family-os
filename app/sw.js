@@ -1,7 +1,7 @@
-// Family OS — Service Worker. app-shell cache ל-offline + טיפול בלחיצה על התראה.
-// שלב 1: אין Push-שרת. ה-SW רק מגיש את הקבצים ומרכז את showNotification.
+// Family OS — Service Worker. app-shell cache ל-offline.
+// עדיין אין Push-שרת (סבב נפרד, ראו CLAUDE.md) — ה-notificationclick למטה מוכן לקראתו.
 
-const CACHE = "family-os-v12";
+const CACHE = "family-os-v13";
 const SHELL = [
   "./",
   "./index.html",
@@ -15,6 +15,7 @@ const SHELL = [
   "./js/render.js",
   "./js/forms.js",
   "./js/notifications.js",
+  "./js/toast.js",
   "./js/firebase.js",
   "./js/cloud.js",
   "./js/auth.js",

@@ -6,7 +6,8 @@ import {
   renderAll, renderTasks, setCategoryFilter, getCategoryFilter, setTaskSearchQuery, setRoutineToggleHandler,
 } from "./render.js";
 import { openItemForm } from "./forms.js";
-import { initNotifications, requestPermission } from "./notifications.js";
+import { initNotifications, setToastHandler, checkAll as checkNotifications } from "./notifications.js";
+import { toast } from "./toast.js";
 import { deviceLabel } from "./cloud.js";
 import { initAuth, signIn, signOutUser, currentUserName } from "./auth.js";
 import { initCalendar } from "./calendar.js";
@@ -146,8 +147,6 @@ function wireButtons() {
   document.getElementById("addRoutineBtn").addEventListener("click", () => openItemForm("routine"));
   document.getElementById("addShopBtn").addEventListener("click", () => openItemForm("shopping"));
 
-  document.getElementById("enableNotifBtn").addEventListener("click", requestPermission);
-
   document.getElementById("resetBtn").addEventListener("click", async () => {
     const btn = document.getElementById("resetBtn");
     if (btn.dataset.armed !== "1") {
@@ -190,15 +189,6 @@ function wireOverlay() {
   });
 }
 
-function toast(msg, ms = 3500) {
-  const el = document.getElementById("toast");
-  if (!el) return;
-  el.textContent = msg;
-  el.hidden = false;
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => { el.hidden = true; }, ms);
-}
-
 function announceMigration() {
   const m = state.sync.migration;
   if (!m) return;
@@ -214,17 +204,19 @@ let _lastCats = "";
 function onStateChange() {
   renderAll();
   updateSyncLine();
+  checkNotifications();
   // רענון רשימת הפילטר אם נוספו/נעלמו תחומים
   const cats = [...new Set(state.tasks.map((t) => t.category))].filter(Boolean).sort().join("|");
   if (cats !== _lastCats) { _lastCats = cats; wireFilters(); }
 }
 
 async function main() {
-  const reg = await registerSW();
+  await registerSW();
 
   setChangeHandler(onStateChange);
   setSyncHandler(updateSyncLine);
   setRoutineToggleHandler(toggleRoutineToday);
+  setToastHandler((title, body) => toast(body ? `${title} — ${body}` : title, 6000));
 
   wireNav();
   wireSidebar();
@@ -239,7 +231,7 @@ async function main() {
   onStateChange();
   announceMigration();
 
-  await initNotifications(reg || (await navigator.serviceWorker?.ready.catch(() => null)));
+  await initNotifications();
 
   initCalendar(onStateChange).catch((e) => console.warn("initCalendar failed:", e));
 }

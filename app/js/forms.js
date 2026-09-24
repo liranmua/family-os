@@ -2,6 +2,8 @@
 // מבוסס family_hub_dashboard.html. כל שמירה עוברת דרך state.js (write-through ל-IndexedDB).
 
 import { state, upsert, remove, saveFinance } from "./state.js";
+import { deviceLabel } from "./cloud.js";
+import { toast as showToast } from "./toast.js";
 import {
   CATEGORY_LIST, ASSIGNABLE_NAMES, ALL_PEOPLE_NAMES, STATUS_LABEL, STATUS_CLASS, STATUS_ORDER,
   TYPE_META, PRIORITY_OPTIONS, FREQUENCY_OPTIONS, SHOP_STATUS_OPTIONS, SHOP_CATEGORY_OPTIONS, SHOP_STORE_TYPES,
@@ -24,14 +26,6 @@ export function closeModal() {
 function openModal(html) {
   modalEl().innerHTML = html;
   overlay().hidden = false;
-}
-
-function showToast(msg) {
-  const el = document.getElementById("toast");
-  el.textContent = msg;
-  el.hidden = false;
-  clearTimeout(showToast._t);
-  showToast._t = setTimeout(() => { el.hidden = true; }, 2200);
 }
 
 // ---- מודאל פירוט משימה ----
@@ -753,6 +747,7 @@ async function saveFromForm(kind, existing) {
       status: val("f-status"),
     };
     if (existing) obj.id = existing.id;
+    else obj.addedBy = deviceLabel(); // לזיהוי "מכשיר אחר הוסיף" בהתראות (ראו notifications.js) — לא שדה בטופס
     await upsert("shopping", obj);
   } else if (kind === "weeklyBlock") {
     const obj = {
