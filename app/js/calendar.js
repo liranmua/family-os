@@ -11,8 +11,9 @@
 // כרגע: היומן של לירן בלבד. מורן תתחבר בנפרד כשתצטרף (מושהה ביוזמתו).
 
 import { getMeta, setMeta } from "./state.js";
+import { GOOGLE_OAUTH_CLIENT_ID } from "./constants.js";
 
-const CLIENT_ID = "670882998874-24bkovc1crf6sfdpf3mkg1nla2a0n1bf.apps.googleusercontent.com";
+const CLIENT_ID = GOOGLE_OAUTH_CLIENT_ID;
 const SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
 const DAYS_AHEAD = 7;
 

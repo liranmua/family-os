@@ -138,6 +138,7 @@ header .sub { font-size: 12.5px; opacity: .75; margin-top: 3px; }
 .linkrow { display: flex; align-items: center; gap: 8px; background: #FAF9F6; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
 .linkrow a { flex: 1; font-size: 13px; color: var(--text-primary); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .linkrow a:hover { text-decoration: underline; }
+.linkrow-icon { width: 15px; height: 15px; vertical-align: middle; border-radius: 2px; }
 
 /* ---- "גם רלוונטי ל" — בחירה מרובה ---- */
 .checkbox-group { display: flex; gap: 16px; flex-wrap: wrap; padding-top: 4px; }

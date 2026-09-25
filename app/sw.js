@@ -1,7 +1,7 @@
 // Family OS — Service Worker. app-shell cache ל-offline.
 // עדיין אין Push-שרת (סבב נפרד, ראו CLAUDE.md) — ה-notificationclick למטה מוכן לקראתו.
 
-const CACHE = "family-os-v13";
+const CACHE = "family-os-v14";
 const SHELL = [
   "./",
   "./index.html",
@@ -21,6 +21,7 @@ const SHELL = [
   "./js/auth.js",
   "./js/nav.js",
   "./js/calendar.js",
+  "./js/drive.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",

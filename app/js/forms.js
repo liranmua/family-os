@@ -15,6 +15,7 @@ import {
   fetchCalendarList as calFetchCalendarList, getAllCalendars as calGetAllCalendars,
   getSelectedCalendarIds as calGetSelectedCalendarIds, setSelectedCalendarIds as calSetSelectedCalendarIds,
 } from "./calendar.js";
+import { pickFile as drivePickFile, getFolderId as driveGetFolderId } from "./drive.js";
 
 const overlay = () => document.getElementById("modalOverlay");
 const modalEl = () => document.getElementById("modal");
@@ -353,8 +354,11 @@ function renderProjectDetailBody() {
 
     <div class="modal-section">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
-        <h4 style="margin:0">קישורים</h4>
-        <button class="icon-edit-btn" id="pdAddLinkBtn">+ קישור</button>
+        <h4 style="margin:0">קבצים מצורפים</h4>
+        <div style="display:flex;gap:6px">
+          <button class="icon-edit-btn" id="pdAddDriveBtn">📎 מ-Drive</button>
+          <button class="icon-edit-btn" id="pdAddLinkBtn">+ קישור</button>
+        </div>
       </div>
       <div id="pdLinkForm" hidden>
         <div class="form-grid">
@@ -372,12 +376,16 @@ function renderProjectDetailBody() {
               .map(
                 (l) => `
             <div class="linkrow">
-              <a href="${escAttr(l.url)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(l.title || l.url)}</a>
+              <a href="${escAttr(l.url)}" target="_blank" rel="noopener noreferrer">${
+                  l.source === "drive"
+                    ? `<img src="${escAttr(l.iconUrl || "")}" alt="" class="linkrow-icon">`
+                    : "🔗"
+                } ${esc(l.title || l.url)}</a>
               <button class="icon-edit-btn" data-del-link="${esc(l.id)}" aria-label="הסרת קישור">✕</button>
             </div>`
               )
               .join("")}</div>`
-          : `<div class="log-empty" id="pdNoLinks">אין עדיין קישורים</div>`
+          : `<div class="log-empty" id="pdNoLinks">אין עדיין קבצים מצורפים</div>`
       }
     </div>
 
@@ -413,6 +421,17 @@ function wireProjectDetailEvents(p) {
       await upsert("task", { ...t, status: cb.checked ? "done" : "todo" });
     })
   );
+
+  document.getElementById("pdAddDriveBtn").addEventListener("click", () => {
+    if (!driveGetFolderId()) { showToast("קודם לבחור תיקיית Drive בהגדרות"); return; }
+    drivePickFile(async (file) => {
+      const links = [
+        ...(p.links || []),
+        { id: nextId("LNK", (p.links || []).map((l) => l.id)), title: file.name, url: file.url, source: "drive", iconUrl: file.iconUrl },
+      ];
+      await upsert("project", { ...p, links });
+    });
+  });
 
   const addBtn = document.getElementById("pdAddLinkBtn");
   const linkForm = document.getElementById("pdLinkForm");

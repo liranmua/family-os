@@ -16,6 +16,7 @@ import {
   isConnected as calIsConnected, getEvents as calGetEvents, getLastFetchedAt as calGetLastFetchedAt,
   getLastError as calGetLastError, connectCalendar, fetchEvents as calFetchEvents, disconnectCalendar,
 } from "./calendar.js";
+import { getFolderId as driveGetFolderId, getFolderName as driveGetFolderName, getLastError as driveGetLastError, pickFolder as drivePickFolder } from "./drive.js";
 
 let activeCategoryFilter = "";
 export function setCategoryFilter(v) { activeCategoryFilter = v; }
@@ -625,6 +626,29 @@ export function renderPeople() {
   ).join("");
 }
 
+// ---- Google Drive (הגדרות: בחירת תיקייה משפחתית ספציפית — קריאה בלבד) ----
+
+export function renderDriveSettings() {
+  const el = document.getElementById("driveSettingsBody");
+  if (!el) return;
+  const folderId = driveGetFolderId();
+  const folderName = driveGetFolderName();
+  const err = driveGetLastError();
+
+  el.innerHTML = `
+    <div class="log-empty" style="margin-bottom:10px">
+      תיקייה אחת ספציפית שממנה אפשר לצרף קבצים לפרויקטים — קריאה בלבד, האפליקציה
+      לא יוצרת/עורכת/מוחקת כלום ב-Drive. כרגע רק חשבון לירן.
+    </div>
+    ${err ? `<div class="field-error" style="margin-bottom:10px">${esc(err)}</div>` : ""}
+    <div class="toolbar-row" style="justify-content:space-between;align-items:center">
+      <span style="font-size:13px">${folderId ? `📁 ${esc(folderName || folderId)}` : "עדיין לא נבחרה תיקייה"}</span>
+      <button class="icon-edit-btn" id="drivePickFolderBtn">${folderId ? "שינוי תיקייה" : "בחירת תיקייה"}</button>
+    </div>`;
+
+  document.getElementById("drivePickFolderBtn").addEventListener("click", () => drivePickFolder());
+}
+
 // ---- הכל ----
 
 let _onRoutineToggle = () => {};
@@ -638,6 +662,7 @@ export function renderAll() {
   renderRoutines(_onRoutineToggle);
   renderShopping();
   renderPeople();
+  renderDriveSettings();
   renderCalendarScreen();
   refreshProjectDetailIfOpen();
 }

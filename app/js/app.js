@@ -11,6 +11,7 @@ import { toast } from "./toast.js";
 import { deviceLabel } from "./cloud.js";
 import { initAuth, signIn, signOutUser, currentUserName } from "./auth.js";
 import { initCalendar } from "./calendar.js";
+import { initDrive } from "./drive.js";
 import { showScreen } from "./nav.js";
 
 const FILTER_CONTAINERS = ["filtersTasks", "filtersRoutines", "filtersProjects"];
@@ -234,6 +235,7 @@ async function main() {
   await initNotifications();
 
   initCalendar(onStateChange).catch((e) => console.warn("initCalendar failed:", e));
+  initDrive(onStateChange).catch((e) => console.warn("initDrive failed:", e));
 }
 
 main();

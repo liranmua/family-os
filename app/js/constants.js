@@ -1,6 +1,10 @@
 // Family OS — קבועים ומפות תצוגה + כלי עזר קטנים.
 // מבוסס family_hub_dashboard.html (הסקיצה המאושרת). נערוך לפי צורך אמיתי, לא לנעול מראש.
 
+// אותו OAuth Client ID שכבר יצר Firebase Auth (Google Sign-In) — משותף לכל בקשת
+// scope נוספת דרך Google Identity Services (calendar.js, drive.js). לא Client חדש.
+export const GOOGLE_OAUTH_CLIENT_ID = "670882998874-24bkovc1crf6sfdpf3mkg1nla2a0n1bf.apps.googleusercontent.com";
+
 export const CATEGORY_COLOR = {
   "פיננסים וניהול עתידי": "var(--accent-fin)",
   "ילדים": "var(--accent-kids)",
