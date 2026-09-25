@@ -310,6 +310,8 @@ function renderProjectDetailBody() {
   if (!p) return;
   const prog = projectProgress(p);
   const linkedTasks = state.tasks.filter((t) => t.projectId === p.id);
+  const linkedShopping = state.shopping.filter((s) => s.linkedProjectId === p.id);
+  const packingItems = p.packingItems || [];
   const log = state.updatesLog.filter((u) => u.entityType === "project" && u.entityId === p.id);
   const links = p.links || [];
 
@@ -349,6 +351,57 @@ function renderProjectDetailBody() {
               )
               .join("")}</div>`
           : `<p style="font-size:13px;color:var(--text-secondary);font-style:italic">אין עדיין משימות מקושרות לפרויקט הזה</p>`
+      }
+    </div>
+
+    <div class="modal-section">
+      <h4>פריטי קניות לפרויקט</h4>
+      ${
+        linkedShopping.length
+          ? `<div class="subtask-list" id="pdShopList">${linkedShopping
+              .map(
+                (s) => `
+            <div class="subtask-item ${s.status === "במלאי" ? "done" : ""}">
+              <input type="checkbox" data-shop-id="${esc(s.id)}" ${s.status === "במלאי" ? "checked" : ""} id="pds-${esc(s.id)}">
+              <label for="pds-${esc(s.id)}" style="flex:1;cursor:pointer">
+                <div class="stx-name">${esc(s.name)}</div>
+                <div class="stx-note">${esc(s.storeType)}${s.qty ? " · " + esc(s.qty) : ""}</div>
+              </label>
+              <button class="icon-edit-btn" data-open-shop="${esc(s.id)}" aria-label="פתיחת הפריט">↗</button>
+            </div>`
+              )
+              .join("")}</div>`
+          : `<p style="font-size:13px;color:var(--text-secondary);font-style:italic">אין עדיין פריטי קניות מתויגים לפרויקט הזה</p>`
+      }
+    </div>
+
+    <div class="modal-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+        <h4 style="margin:0">רשימת אריזה</h4>
+        <button class="icon-edit-btn" id="pdAddPackBtn">+ פריט</button>
+      </div>
+      <div id="pdPackForm" hidden>
+        <div class="form-field"><input type="text" id="pd-pack-name" placeholder="שם הפריט"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button type="button" class="btn-secondary" id="pdPackCancel">ביטול</button>
+          <button type="button" class="btn-primary" id="pdPackSave">הוספה</button>
+        </div>
+      </div>
+      ${
+        packingItems.length
+          ? `<div class="subtask-list" id="pdPackList">${packingItems
+              .map(
+                (it) => `
+            <div class="subtask-item ${it.packed ? "done" : ""}">
+              <input type="checkbox" data-pack-id="${esc(it.id)}" ${it.packed ? "checked" : ""} id="pdp-${esc(it.id)}">
+              <label for="pdp-${esc(it.id)}" style="flex:1;cursor:pointer">
+                <div class="stx-name">${esc(it.name)}</div>
+              </label>
+              <button class="icon-edit-btn" data-del-pack="${esc(it.id)}" aria-label="הסרה">✕</button>
+            </div>`
+              )
+              .join("")}</div>`
+          : `<div class="log-empty" id="pdNoPack">אין עדיין פריטים ברשימת האריזה</div>`
       }
     </div>
 
@@ -419,6 +472,40 @@ function wireProjectDetailEvents(p) {
       const t = state.tasks.find((x) => x.id === cb.dataset.taskId);
       if (!t) return;
       await upsert("task", { ...t, status: cb.checked ? "done" : "todo" });
+    })
+  );
+
+  document.querySelectorAll("[data-open-shop]").forEach((btn) =>
+    btn.addEventListener("click", () => openItemForm("shopping", btn.dataset.openShop))
+  );
+  document.querySelectorAll("#pdShopList input[type=checkbox]").forEach((cb) =>
+    cb.addEventListener("change", async () => {
+      const s = state.shopping.find((x) => x.id === cb.dataset.shopId);
+      if (!s) return;
+      await upsert("shopping", { ...s, status: cb.checked ? "במלאי" : "חסר" });
+    })
+  );
+
+  const addPackBtn = document.getElementById("pdAddPackBtn");
+  const packForm = document.getElementById("pdPackForm");
+  addPackBtn.addEventListener("click", () => { packForm.hidden = false; addPackBtn.hidden = true; });
+  document.getElementById("pdPackCancel").addEventListener("click", () => { packForm.hidden = true; addPackBtn.hidden = false; });
+  document.getElementById("pdPackSave").addEventListener("click", async () => {
+    const name = document.getElementById("pd-pack-name").value.trim();
+    if (!name) return;
+    const packingItems = [...(p.packingItems || []), { id: nextId("PCK", (p.packingItems || []).map((x) => x.id)), name, packed: false }];
+    await upsert("project", { ...p, packingItems });
+  });
+  document.querySelectorAll("#pdPackList input[type=checkbox]").forEach((cb) =>
+    cb.addEventListener("change", async () => {
+      const packingItems = (p.packingItems || []).map((it) => (it.id === cb.dataset.packId ? { ...it, packed: cb.checked } : it));
+      await upsert("project", { ...p, packingItems });
+    })
+  );
+  document.querySelectorAll("[data-del-pack]").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      const packingItems = (p.packingItems || []).filter((it) => it.id !== btn.dataset.delPack);
+      await upsert("project", { ...p, packingItems });
     })
   );
 
@@ -564,6 +651,7 @@ function shoppingFormBody(s) {
       <div class="form-field"><label for="f-price">מחיר ליחידה (₪, לא חובה)</label><input type="number" id="f-price" step="0.1" min="0" value="${s.price != null ? escAttr(s.price) : ""}" placeholder="למשל 12.90"></div>
       <div class="form-field"><label for="f-status">סטטוס</label><select id="f-status">${optionList(SHOP_STATUS_OPTIONS, s.status || "חסר")}</select></div>
     </div>
+    <div class="form-field"><label for="f-linkedProjectId">שייך לפרויקט (לא חובה)</label><select id="f-linkedProjectId"><option value="">—</option>${state.projects.map((p) => `<option value="${escAttr(p.id)}" ${p.id === s.linkedProjectId ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
     <div class="form-field"><label for="f-notes">הערות (לא חובה)</label><input type="text" id="f-notes" value="${escAttr(s.notes || "")}" placeholder="למשל: הסוג האורגני"></div>`;
 }
 
@@ -764,6 +852,7 @@ async function saveFromForm(kind, existing) {
       price: priceVal !== "" ? Number(priceVal) : null,
       notes: trimVal("f-notes") || null,
       status: val("f-status"),
+      linkedProjectId: val("f-linkedProjectId") || null,
     };
     if (existing) obj.id = existing.id;
     else obj.addedBy = deviceLabel(); // לזיהוי "מכשיר אחר הוסיף" בהתראות (ראו notifications.js) — לא שדה בטופס

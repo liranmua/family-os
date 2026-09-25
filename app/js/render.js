@@ -373,9 +373,10 @@ export function renderShopping() {
     ? list
         .map((s) => {
           const lt = lineTotal(s);
+          const proj = s.linkedProjectId ? state.projects.find((p) => p.id === s.linkedProjectId) : null;
           return `
         <tr class="row-click" data-shop-id="${esc(s.id)}" tabindex="0">
-          <td>${esc(s.name)}</td>
+          <td>${esc(s.name)}${proj ? `<span class="related-badge" style="margin-inline-start:6px">🧩 ${esc(proj.name)}</span>` : ""}</td>
           <td>${esc(s.category || "—")}</td>
           <td>${esc(s.qty || "—")}</td>
           <td>${s.price != null ? fmtMoney(s.price) : "—"}</td>
