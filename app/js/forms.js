@@ -312,6 +312,7 @@ function renderProjectDetailBody() {
   const linkedTasks = state.tasks.filter((t) => t.projectId === p.id);
   const linkedShopping = state.shopping.filter((s) => s.linkedProjectId === p.id);
   const packingItems = p.packingItems || [];
+  const places = p.places || [];
   const log = state.updatesLog.filter((u) => u.entityType === "project" && u.entityId === p.id);
   const links = p.links || [];
 
@@ -397,11 +398,47 @@ function renderProjectDetailBody() {
               <label for="pdp-${esc(it.id)}" style="flex:1;cursor:pointer">
                 <div class="stx-name">${esc(it.name)}</div>
               </label>
+              <label class="pack-needbuy" style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--text-secondary);cursor:pointer">
+                <input type="checkbox" data-needbuy-pack="${esc(it.id)}" ${it.needsBuy ? "checked" : ""}> צריך לקנות
+              </label>
               <button class="icon-edit-btn" data-del-pack="${esc(it.id)}" aria-label="הסרה">✕</button>
             </div>`
               )
               .join("")}</div>`
           : `<div class="log-empty" id="pdNoPack">אין עדיין פריטים ברשימת האריזה</div>`
+      }
+    </div>
+
+    <div class="modal-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+        <h4 style="margin:0">מקומות מומלצים</h4>
+        <button class="icon-edit-btn" id="pdAddPlaceBtn">+ מקום</button>
+      </div>
+      <div id="pdPlaceForm" hidden>
+        <div class="form-field"><label for="pd-place-name">שם המקום <span class="req-hint">*</span></label><input type="text" id="pd-place-name" placeholder="למשל: מעיין חרוד"></div>
+        <div class="form-field"><label for="pd-place-url">קישור (לא חובה)</label><input type="text" id="pd-place-url" placeholder="https://..."></div>
+        <div class="form-field"><label for="pd-place-notes">הערות (לא חובה)</label><textarea id="pd-place-notes" placeholder="למה מומלץ, מתי היינו, מה לזכור..."></textarea></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button type="button" class="btn-secondary" id="pdPlaceCancel">ביטול</button>
+          <button type="button" class="btn-primary" id="pdPlaceSave">שמירה</button>
+        </div>
+      </div>
+      ${
+        places.length
+          ? `<div id="pdPlacesList">${places
+              .map(
+                (pl) => `
+            <div class="linkrow" style="align-items:flex-start">
+              <div style="flex:1">
+                <div style="font-weight:600;font-size:13px">📍 ${esc(pl.name)}${pl.url ? ` · <a href="${escAttr(pl.url)}" target="_blank" rel="noopener noreferrer">🔗 קישור</a>` : ""}</div>
+                ${pl.notes ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:3px;white-space:pre-wrap">${esc(pl.notes)}</div>` : ""}
+              </div>
+              <button class="icon-edit-btn" data-edit-place="${esc(pl.id)}" aria-label="עריכת מקום">✏️</button>
+              <button class="icon-edit-btn" data-del-place="${esc(pl.id)}" aria-label="הסרת מקום">✕</button>
+            </div>`
+              )
+              .join("")}</div>`
+          : `<div class="log-empty" id="pdNoPlaces">אין עדיין מקומות מומלצים</div>`
       }
     </div>
 
@@ -496,7 +533,7 @@ function wireProjectDetailEvents(p) {
     const packingItems = [...(p.packingItems || []), { id: nextId("PCK", (p.packingItems || []).map((x) => x.id)), name, packed: false }];
     await upsert("project", { ...p, packingItems });
   });
-  document.querySelectorAll("#pdPackList input[type=checkbox]").forEach((cb) =>
+  document.querySelectorAll("#pdPackList input[data-pack-id]").forEach((cb) =>
     cb.addEventListener("change", async () => {
       const packingItems = (p.packingItems || []).map((it) => (it.id === cb.dataset.packId ? { ...it, packed: cb.checked } : it));
       await upsert("project", { ...p, packingItems });
@@ -506,6 +543,79 @@ function wireProjectDetailEvents(p) {
     btn.addEventListener("click", async () => {
       const packingItems = (p.packingItems || []).filter((it) => it.id !== btn.dataset.delPack);
       await upsert("project", { ...p, packingItems });
+    })
+  );
+  // "צריך לקנות" על פריט אריזה: יוצר/מוחק אוטומטית פריט קניות מקושר (ראו חלק ג'
+  // ב-Family_OS_Shopping_Project_Tag_Brief.md) — שימוש חוזר מלא במנגנון התיוג של חלק א'.
+  document.querySelectorAll("#pdPackList input[data-needbuy-pack]").forEach((cb) =>
+    cb.addEventListener("change", async () => {
+      const items = p.packingItems || [];
+      const it = items.find((x) => x.id === cb.dataset.needbuyPack);
+      if (!it) return;
+      if (cb.checked) {
+        if (it.linkedShoppingId) return; // כבר קיים קישור — לא משכפלים
+        const shopItem = await upsert("shopping", {
+          name: it.name,
+          storeType: "בית-אחר",
+          category: "אחר",
+          qty: "",
+          status: "חסר",
+          linkedProjectId: p.id,
+          addedBy: deviceLabel(),
+        });
+        const packingItems = items.map((x) => (x.id === it.id ? { ...x, needsBuy: true, linkedShoppingId: shopItem.id } : x));
+        await upsert("project", { ...p, packingItems });
+      } else {
+        const linked = it.linkedShoppingId ? state.shopping.find((s) => s.id === it.linkedShoppingId) : null;
+        if (linked && linked.status !== "במלאי") await remove("shopping", linked.id); // עדיין לא נקנה בפועל — מוחקים
+        const packingItems = items.map((x) => (x.id === it.id ? { ...x, needsBuy: false, linkedShoppingId: null } : x));
+        await upsert("project", { ...p, packingItems });
+      }
+    })
+  );
+
+  // ---- מקומות מומלצים ----
+  const addPlaceBtn = document.getElementById("pdAddPlaceBtn");
+  const placeForm = document.getElementById("pdPlaceForm");
+  const placeNameInput = document.getElementById("pd-place-name");
+  const placeUrlInput = document.getElementById("pd-place-url");
+  const placeNotesInput = document.getElementById("pd-place-notes");
+  let editingPlaceId = null;
+
+  const openPlaceForm = (place) => {
+    editingPlaceId = place ? place.id : null;
+    placeNameInput.value = place ? place.name || "" : "";
+    placeUrlInput.value = place ? place.url || "" : "";
+    placeNotesInput.value = place ? place.notes || "" : "";
+    placeForm.hidden = false;
+    addPlaceBtn.hidden = true;
+  };
+  const closePlaceForm = () => { placeForm.hidden = true; addPlaceBtn.hidden = false; editingPlaceId = null; };
+
+  addPlaceBtn.addEventListener("click", () => openPlaceForm(null));
+  document.getElementById("pdPlaceCancel").addEventListener("click", closePlaceForm);
+  document.getElementById("pdPlaceSave").addEventListener("click", async () => {
+    const name = placeNameInput.value.trim();
+    if (!name) return;
+    let url = placeUrlInput.value.trim();
+    if (url && !/^https?:\/\//i.test(url)) url = "https://" + url;
+    const notes = placeNotesInput.value.trim();
+    const existingPlaces = p.places || [];
+    const places = editingPlaceId
+      ? existingPlaces.map((pl) => (pl.id === editingPlaceId ? { ...pl, name, url: url || null, notes: notes || null } : pl))
+      : [...existingPlaces, { id: nextId("PLC", existingPlaces.map((pl) => pl.id)), name, url: url || null, notes: notes || null }];
+    await upsert("project", { ...p, places });
+  });
+  document.querySelectorAll("[data-edit-place]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const place = (p.places || []).find((pl) => pl.id === btn.dataset.editPlace);
+      if (place) openPlaceForm(place);
+    })
+  );
+  document.querySelectorAll("[data-del-place]").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      const places = (p.places || []).filter((pl) => pl.id !== btn.dataset.delPlace);
+      await upsert("project", { ...p, places });
     })
   );
 
