@@ -1,7 +1,7 @@
 // Family OS — פונקציות render. קוראות מ-state, לא משנות אותו.
 // מבוסס family_hub_dashboard.html.
 
-import { state } from "./state.js";
+import { state, upsert } from "./state.js";
 import {
   CATEGORY_COLOR, PEOPLE, ASSIGNABLE_NAMES, EMAIL_TO_NAME, STATUS_LABEL, STATUS_CLASS, TYPE_META, SHOP_STORE_TYPES, DAY_NAMES,
   formatDateDisplay, todayStr, esc,
@@ -324,6 +324,23 @@ export function getActiveStoreType() { return activeStoreType; }
 
 function itemStoreType(s) { return s.storeType || SHOP_STORE_TYPES[0]; }
 
+// תצוגה מסווגת לפי קטגוריה (Family_OS_Category_View_Brief.md) — כללי, לשימוש גם
+// בקניות (כאן) וגם ברשימת אריזה בפרויקט (forms.js). קטגוריה היא טקסט חופשי, לא
+// רשימה סגורה; פריטים בלי קטגוריה מקובצים תחת "ללא קטגוריה" בסוף, לא נעלמים.
+const NO_CATEGORY = "ללא קטגוריה";
+export function groupByCategory(items) {
+  const groups = new Map();
+  items.forEach((it) => {
+    const key = (it.category || "").trim() || NO_CATEGORY;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(it);
+  });
+  const keys = [...groups.keys()];
+  const withCat = keys.filter((k) => k !== NO_CATEGORY).sort((a, b) => a.localeCompare(b, "he"));
+  const ordered = keys.includes(NO_CATEGORY) ? [...withCat, NO_CATEGORY] : withCat;
+  return ordered.map((category) => ({ category, items: groups.get(category) }));
+}
+
 function renderStoreTabs() {
   const tabsEl = document.getElementById("storeTabs");
   if (!tabsEl) return;
@@ -365,19 +382,13 @@ function renderShopSubtotal(list) {
     ${withPrice.length < relevant.length ? `<span class="shop-subtotal-note">(${relevant.length - withPrice.length} בלי מחיר)</span>` : ""}`;
 }
 
-export function renderShopping() {
-  renderStoreTabs();
-  const list = state.shopping.filter((s) => itemStoreType(s) === activeStoreType);
-  renderShopSubtotal(list);
-  const rows = list.length
-    ? list
-        .map((s) => {
-          const lt = lineTotal(s);
-          const proj = s.linkedProjectId ? state.projects.find((p) => p.id === s.linkedProjectId) : null;
-          return `
+function shopRowHtml(s) {
+  const lt = lineTotal(s);
+  const proj = s.linkedProjectId ? state.projects.find((p) => p.id === s.linkedProjectId) : null;
+  return `
         <tr class="row-click" data-shop-id="${esc(s.id)}" tabindex="0">
           <td>${esc(s.name)}${proj ? `<span class="related-badge" style="margin-inline-start:6px">🧩 ${esc(proj.name)}</span>` : ""}</td>
-          <td>${esc(s.category || "—")}</td>
+          <td><input type="text" class="inline-cat-input" list="shopCategoryDatalist" data-cat-shop="${esc(s.id)}" value="${esc(s.category || "")}" placeholder="קטגוריה"></td>
           <td>${esc(s.qty || "—")}</td>
           <td>${s.price != null ? fmtMoney(s.price) : "—"}</td>
           <td>${lt != null ? fmtMoney(lt) : "—"}</td>
@@ -385,7 +396,15 @@ export function renderShopping() {
           <td><span class="shop-pill shop-${esc(s.status)}">${esc(s.status)}</span></td>
           <td class="chevron">›</td>
         </tr>`;
-        })
+}
+
+export function renderShopping() {
+  renderStoreTabs();
+  const list = state.shopping.filter((s) => itemStoreType(s) === activeStoreType);
+  renderShopSubtotal(list);
+  const rows = list.length
+    ? groupByCategory(list)
+        .map(({ category, items }) => `<tr class="cat-header-row"><td colspan="8">${esc(category)}</td></tr>${items.map(shopRowHtml).join("")}`)
         .join("")
     : `<tr class="empty-row"><td colspan="8">הרשימה "${esc(activeStoreType)}" ריקה — הוסיפו פריט עם הכפתור למעלה</td></tr>`;
 
@@ -393,10 +412,23 @@ export function renderShopping() {
     <thead><tr><th>פריט</th><th>קטגוריה</th><th>כמות</th><th>מחיר</th><th>סה״כ</th><th>הערות</th><th>סטטוס</th><th></th></tr></thead>
     <tbody>${rows}</tbody>`;
 
+  const dl = document.getElementById("shopCategoryDatalist");
+  if (dl) {
+    const cats = [...new Set(state.shopping.map((s) => s.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
+    dl.innerHTML = cats.map((c) => `<option value="${esc(c)}">`).join("");
+  }
+
   document.querySelectorAll("#shopTable tr.row-click").forEach((row) => {
     const open = () => openItemForm("shopping", row.dataset.shopId);
-    row.addEventListener("click", open);
-    row.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+    row.addEventListener("click", (e) => { if (e.target.closest("input,select,textarea")) return; open(); });
+    row.addEventListener("keydown", (e) => { if (e.target.closest("input,select,textarea")) return; if (e.key === "Enter") open(); });
+  });
+  document.querySelectorAll("#shopTable input[data-cat-shop]").forEach((inp) => {
+    inp.addEventListener("change", async () => {
+      const s = state.shopping.find((x) => x.id === inp.dataset.catShop);
+      if (!s) return;
+      await upsert("shopping", { ...s, category: inp.value.trim() || null });
+    });
   });
 }
 

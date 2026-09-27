@@ -6,10 +6,10 @@ import { deviceLabel } from "./cloud.js";
 import { toast as showToast } from "./toast.js";
 import {
   CATEGORY_LIST, ASSIGNABLE_NAMES, ALL_PEOPLE_NAMES, STATUS_LABEL, STATUS_CLASS, STATUS_ORDER,
-  TYPE_META, PRIORITY_OPTIONS, FREQUENCY_OPTIONS, SHOP_STATUS_OPTIONS, SHOP_CATEGORY_OPTIONS, SHOP_STORE_TYPES,
+  TYPE_META, PRIORITY_OPTIONS, FREQUENCY_OPTIONS, SHOP_STATUS_OPTIONS, SHOP_STORE_TYPES,
   DAY_NAMES, optionList, formatDateDisplay, nextId, todayStr, esc, escAttr, splitBulkText,
 } from "./constants.js";
-import { renderAll, projectProgress, subtaskProgress, getActiveStoreType } from "./render.js";
+import { renderAll, projectProgress, subtaskProgress, getActiveStoreType, groupByCategory } from "./render.js";
 import { showScreen } from "./nav.js";
 import {
   fetchCalendarList as calFetchCalendarList, getAllCalendars as calGetAllCalendars,
@@ -53,7 +53,7 @@ function wireBulkAddToggle(ids, onSave) {
 export async function bulkAddShoppingItems(names, storeType, linkedProjectId = null) {
   for (const name of names) {
     await upsert("shopping", {
-      name, storeType, category: "אחר", qty: "1", price: null, notes: null, status: "חסר",
+      name, storeType, category: null, qty: "1", price: null, notes: null, status: "חסר",
       linkedProjectId: linkedProjectId || null,
       addedBy: deviceLabel(),
     });
@@ -440,7 +440,10 @@ function renderProjectDetailBody() {
         </div>
       </div>
       <div id="pdPackForm" hidden>
-        <div class="form-field"><input type="text" id="pd-pack-name" placeholder="שם הפריט"></div>
+        <div class="form-grid">
+          <div class="form-field"><input type="text" id="pd-pack-name" placeholder="שם הפריט"></div>
+          <div class="form-field"><input type="text" id="pd-pack-category" list="packCategoryDatalist" placeholder="קטגוריה (לא חובה)"></div>
+        </div>
         <div style="display:flex;justify-content:flex-end;gap:8px">
           <button type="button" class="btn-secondary" id="pdPackCancel">ביטול</button>
           <button type="button" class="btn-primary" id="pdPackSave">הוספה</button>
@@ -453,9 +456,14 @@ function renderProjectDetailBody() {
           <button type="button" class="btn-primary" id="pdPackBulkSave">הוסף הכל</button>
         </div>
       </div>
+      <datalist id="packCategoryDatalist">${packingCategoryOptions().map((c) => `<option value="${escAttr(c)}">`).join("")}</datalist>
       ${
         packingItems.length
-          ? `<div class="subtask-list" id="pdPackList">${packingItems
+          ? `<div id="pdPackList">${groupByCategory(packingItems)
+              .map(
+                ({ category, items }) => `
+            <div class="ug-head" style="margin-top:10px">${esc(category)}</div>
+            <div class="subtask-list">${items
               .map(
                 (it) => `
             <div class="subtask-item ${it.packed ? "done" : ""}">
@@ -463,11 +471,14 @@ function renderProjectDetailBody() {
               <label for="pdp-${esc(it.id)}" style="flex:1;cursor:pointer">
                 <div class="stx-name">${esc(it.name)}</div>
               </label>
+              <input type="text" class="inline-cat-input" list="packCategoryDatalist" data-cat-pack="${esc(it.id)}" value="${escAttr(it.category || "")}" placeholder="קטגוריה" style="max-width:110px">
               <label class="pack-needbuy" style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--text-secondary);cursor:pointer">
                 <input type="checkbox" data-needbuy-pack="${esc(it.id)}" ${it.needsBuy ? "checked" : ""}> צריך לקנות
               </label>
               <button class="icon-edit-btn" data-del-pack="${esc(it.id)}" aria-label="הסרה">✕</button>
             </div>`
+              )
+              .join("")}</div>`
               )
               .join("")}</div>`
           : `<div class="log-empty" id="pdNoPack">אין עדיין פריטים ברשימת האריזה</div>`
@@ -604,12 +615,19 @@ function wireProjectDetailEvents(p) {
   document.getElementById("pdPackSave").addEventListener("click", async () => {
     const name = document.getElementById("pd-pack-name").value.trim();
     if (!name) return;
-    const packingItems = [...(p.packingItems || []), { id: nextId("PCK", (p.packingItems || []).map((x) => x.id)), name, packed: false }];
+    const category = document.getElementById("pd-pack-category").value.trim() || null;
+    const packingItems = [...(p.packingItems || []), { id: nextId("PCK", (p.packingItems || []).map((x) => x.id)), name, packed: false, category }];
     await upsert("project", { ...p, packingItems });
   });
   document.querySelectorAll("#pdPackList input[data-pack-id]").forEach((cb) =>
     cb.addEventListener("change", async () => {
       const packingItems = (p.packingItems || []).map((it) => (it.id === cb.dataset.packId ? { ...it, packed: cb.checked } : it));
+      await upsert("project", { ...p, packingItems });
+    })
+  );
+  document.querySelectorAll("#pdPackList input[data-cat-pack]").forEach((inp) =>
+    inp.addEventListener("change", async () => {
+      const packingItems = (p.packingItems || []).map((it) => (it.id === inp.dataset.catPack ? { ...it, category: inp.value.trim() || null } : it));
       await upsert("project", { ...p, packingItems });
     })
   );
@@ -631,7 +649,7 @@ function wireProjectDetailEvents(p) {
         const shopItem = await upsert("shopping", {
           name: it.name,
           storeType: "בית-אחר",
-          category: "אחר",
+          category: it.category || null,
           qty: "",
           status: "חסר",
           linkedProjectId: p.id,
@@ -824,17 +842,29 @@ function projectFormBody(p) {
     <div class="form-field"><label for="f-notes">הערות (לא חובה)</label><input type="text" id="f-notes" value="${escAttr(p.notes || "")}"></div>`;
 }
 
+// קטגוריה: טקסט חופשי עם השלמה אוטומטית מתוך קטגוריות שכבר הוזנו בעבר — לא
+// רשימה סגורה (Family_OS_Category_View_Brief.md). קניות ואריזה נשארות נפרדות
+// (הצעות של סוג אחד לא "מזהמות" את השני).
+function shoppingCategoryOptions() {
+  return [...new Set(state.shopping.map((s) => s.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
+}
+function packingCategoryOptions() {
+  const all = state.projects.flatMap((p) => (p.packingItems || []).map((it) => it.category));
+  return [...new Set(all.filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
+}
+
 function shoppingFormBody(s) {
   const storeType = s.storeType || getActiveStoreType();
   return `
     <div class="form-field"><label for="f-name">שם הפריט <span class="req-hint">*</span></label><input type="text" id="f-name" required value="${escAttr(s.name || "")}"></div>
     <div class="form-grid">
       <div class="form-field"><label for="f-storeType">רשימה</label><select id="f-storeType">${optionList(SHOP_STORE_TYPES, storeType)}</select></div>
-      <div class="form-field"><label for="f-category">קטגוריה</label><select id="f-category">${optionList(SHOP_CATEGORY_OPTIONS, s.category || "אחר")}</select></div>
+      <div class="form-field"><label for="f-category">קטגוריה (לא חובה)</label><input type="text" id="f-category" list="shopCategoryDatalistModal" value="${escAttr(s.category || "")}" placeholder="למשל: מטבח ובישול"></div>
       <div class="form-field"><label for="f-qty">כמות</label><input type="text" id="f-qty" value="${escAttr(s.qty || "")}" placeholder="למשל 2 / קרטון"></div>
       <div class="form-field"><label for="f-price">מחיר ליחידה (₪, לא חובה)</label><input type="number" id="f-price" step="0.1" min="0" value="${s.price != null ? escAttr(s.price) : ""}" placeholder="למשל 12.90"></div>
       <div class="form-field"><label for="f-status">סטטוס</label><select id="f-status">${optionList(SHOP_STATUS_OPTIONS, s.status || "חסר")}</select></div>
     </div>
+    <datalist id="shopCategoryDatalistModal">${shoppingCategoryOptions().map((c) => `<option value="${escAttr(c)}">`).join("")}</datalist>
     <div class="form-field"><label for="f-linkedProjectId">שייך לפרויקט (לא חובה)</label><select id="f-linkedProjectId"><option value="">—</option>${state.projects.map((p) => `<option value="${escAttr(p.id)}" ${p.id === s.linkedProjectId ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
     <div class="form-field"><label for="f-notes">הערות (לא חובה)</label><input type="text" id="f-notes" value="${escAttr(s.notes || "")}" placeholder="למשל: הסוג האורגני"></div>`;
 }
@@ -1031,7 +1061,7 @@ async function saveFromForm(kind, existing) {
       ...(existing || {}),
       name,
       storeType: val("f-storeType"),
-      category: val("f-category"),
+      category: trimVal("f-category") || null,
       qty: trimVal("f-qty"),
       price: priceVal !== "" ? Number(priceVal) : null,
       notes: trimVal("f-notes") || null,

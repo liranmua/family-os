@@ -213,6 +213,9 @@ tr.row-click { cursor: pointer; }
 tr.row-click:hover { background: #FAF9F6; }
 .chevron { color: var(--text-secondary); font-size: 15px; }
 .empty-row td { text-align: center; color: var(--text-secondary); font-style: italic; padding: 22px; }
+.cat-header-row td { background: #FAFAF8; color: var(--text-secondary); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; padding: 7px 12px; }
+.inline-cat-input { width: 100%; min-width: 90px; padding: 5px 7px; border: 1px solid #E5E2DB; border-radius: 6px; font-size: 12.5px; font-family: inherit; background: #fff; color: var(--text-primary); }
+.inline-cat-input:focus { outline: 2px solid var(--accent-fin); outline-offset: 1px; }
 
 .type-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 6px; font-size: 11px; margin-inline-end: 6px; }
 .type-once { background: rgba(76,114,176,.15); }
@@ -278,7 +281,7 @@ tr.row-click:hover { background: #FAF9F6; }
 .meta-item .v { font-size: 13.5px; font-weight: 600; }
 .modal-section h4 { font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .3px; margin-bottom: 9px; }
 .subtask-list { display: flex; flex-direction: column; gap: 8px; }
-.subtask-item { display: flex; align-items: flex-start; gap: 10px; background: #FAF9F6; border-radius: 8px; padding: 9px 11px; }
+.subtask-item { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; background: #FAF9F6; border-radius: 8px; padding: 9px 11px; }
 .subtask-item input[type=checkbox] { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--positive); cursor: pointer; flex-shrink: 0; }
 .subtask-item .stx-name { font-size: 13.5px; }
 .subtask-item.done .stx-name { text-decoration: line-through; color: var(--text-secondary); }
