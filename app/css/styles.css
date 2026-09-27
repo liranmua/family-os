@@ -257,6 +257,7 @@ tr.row-click:hover { background: #FAF9F6; }
 .add-row:hover { background: #FAF9F6; }
 
 .toolbar-row { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+.bulk-add-form { margin-bottom: var(--gap); }
 .btn-primary { background: var(--bg-header); color: #fff; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
 .btn-primary:hover { opacity: .92; }
 .btn-secondary { background: #EEECE7; color: var(--text-primary); border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }

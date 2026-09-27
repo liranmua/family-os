@@ -81,7 +81,17 @@
         <div class="screen-head"><button class="back-btn" data-back>‹ חזרה</button><h2>🛒 רשימת קניות</h2></div>
         <div class="store-tabs" id="storeTabs"></div>
         <div class="shop-subtotal" id="shopSubtotal"></div>
-        <div class="toolbar-row"><button class="btn-primary" id="addShopBtn">+ פריט קניות</button></div>
+        <div class="toolbar-row" style="gap:8px">
+          <button class="btn-primary" id="addShopBtn">+ פריט קניות</button>
+          <button class="btn-secondary" id="shopBulkBtn">+ הוספה מרובה</button>
+        </div>
+        <div id="shopBulkForm" hidden class="bulk-add-form">
+          <div class="form-field"><textarea id="shopBulkText" placeholder="הדביקו רשימה — שורה או פסיק לכל פריט"></textarea></div>
+          <div style="display:flex;justify-content:flex-end;gap:8px">
+            <button type="button" class="btn-secondary" id="shopBulkCancel">ביטול</button>
+            <button type="button" class="btn-primary" id="shopBulkSave">הוסף הכל</button>
+          </div>
+        </div>
         <div class="table-wrap"><table id="shopTable"></table></div>
       </div>
 

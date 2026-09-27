@@ -7,7 +7,7 @@ import { toast as showToast } from "./toast.js";
 import {
   CATEGORY_LIST, ASSIGNABLE_NAMES, ALL_PEOPLE_NAMES, STATUS_LABEL, STATUS_CLASS, STATUS_ORDER,
   TYPE_META, PRIORITY_OPTIONS, FREQUENCY_OPTIONS, SHOP_STATUS_OPTIONS, SHOP_CATEGORY_OPTIONS, SHOP_STORE_TYPES,
-  DAY_NAMES, optionList, formatDateDisplay, nextId, todayStr, esc, escAttr,
+  DAY_NAMES, optionList, formatDateDisplay, nextId, todayStr, esc, escAttr, splitBulkText,
 } from "./constants.js";
 import { renderAll, projectProgress, subtaskProgress, getActiveStoreType } from "./render.js";
 import { showScreen } from "./nav.js";
@@ -27,6 +27,51 @@ export function closeModal() {
 function openModal(html) {
   modalEl().innerHTML = html;
   overlay().hidden = false;
+}
+
+// ---- הוספה מרובה (הדבקת רשימה, Family_OS_Bulk_Add_Brief.md) ----
+// חיווט משותף לכפתור-מתג + תיבת טקסט, בכל אחד משלושת המקומות (קניות/פריטי-קניות-
+// לפרויקט/רשימת אריזה) — כל מקום מעביר את לוגיקת השמירה שלו בלבד.
+function wireBulkAddToggle(ids, onSave) {
+  const btn = document.getElementById(ids.btn);
+  const form = document.getElementById(ids.form);
+  const textarea = document.getElementById(ids.textarea);
+  if (!btn || !form || !textarea) return;
+  const close = () => { form.hidden = true; btn.hidden = false; textarea.value = ""; };
+  btn.addEventListener("click", () => { form.hidden = false; btn.hidden = true; textarea.focus(); });
+  document.getElementById(ids.cancel).addEventListener("click", close);
+  document.getElementById(ids.save).addEventListener("click", async () => {
+    const names = splitBulkText(textarea.value);
+    if (!names.length) return;
+    await onSave(names);
+    close();
+  });
+}
+
+// יוצר פריט קניות נפרד לכל שם, בברירות המחדל של הוספה בודדת רגילה (כמות=1,
+// בלי הערות/מחיר, סטטוס "חסר"). linkedProjectId מתויג אוטומטית אם ניתן.
+export async function bulkAddShoppingItems(names, storeType, linkedProjectId = null) {
+  for (const name of names) {
+    await upsert("shopping", {
+      name, storeType, category: "אחר", qty: "1", price: null, notes: null, status: "חסר",
+      linkedProjectId: linkedProjectId || null,
+      addedBy: deviceLabel(),
+    });
+  }
+}
+
+// יוצר פריט רשימת-אריזה נפרד לכל שם, לא-מסומן-כארוז (כמו הוספה בודדת).
+export async function bulkAddPackingItems(projectId, names) {
+  const p = state.projects.find((x) => x.id === projectId);
+  if (!p) return;
+  let ids = (p.packingItems || []).map((x) => x.id);
+  const created = [];
+  for (const name of names) {
+    const id = nextId("PCK", ids);
+    ids = [...ids, id];
+    created.push({ id, name, packed: false });
+  }
+  await upsert("project", { ...p, packingItems: [...(p.packingItems || []), ...created] });
 }
 
 // ---- מודאל פירוט משימה ----
@@ -356,7 +401,17 @@ function renderProjectDetailBody() {
     </div>
 
     <div class="modal-section">
-      <h4>פריטי קניות לפרויקט</h4>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+        <h4 style="margin:0">פריטי קניות לפרויקט</h4>
+        <button class="icon-edit-btn" id="pdShopBulkBtn">+ הוספה מרובה</button>
+      </div>
+      <div id="pdShopBulkForm" hidden>
+        <div class="form-field"><textarea id="pd-shop-bulk-text" placeholder="הדביקו רשימה — שורה או פסיק לכל פריט"></textarea></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button type="button" class="btn-secondary" id="pdShopBulkCancel">ביטול</button>
+          <button type="button" class="btn-primary" id="pdShopBulkSave">הוסף הכל</button>
+        </div>
+      </div>
       ${
         linkedShopping.length
           ? `<div class="subtask-list" id="pdShopList">${linkedShopping
@@ -379,13 +434,23 @@ function renderProjectDetailBody() {
     <div class="modal-section">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
         <h4 style="margin:0">רשימת אריזה</h4>
-        <button class="icon-edit-btn" id="pdAddPackBtn">+ פריט</button>
+        <div style="display:flex;gap:6px">
+          <button class="icon-edit-btn" id="pdPackBulkBtn">+ הוספה מרובה</button>
+          <button class="icon-edit-btn" id="pdAddPackBtn">+ פריט</button>
+        </div>
       </div>
       <div id="pdPackForm" hidden>
         <div class="form-field"><input type="text" id="pd-pack-name" placeholder="שם הפריט"></div>
         <div style="display:flex;justify-content:flex-end;gap:8px">
           <button type="button" class="btn-secondary" id="pdPackCancel">ביטול</button>
           <button type="button" class="btn-primary" id="pdPackSave">הוספה</button>
+        </div>
+      </div>
+      <div id="pdPackBulkForm" hidden>
+        <div class="form-field"><textarea id="pd-pack-bulk-text" placeholder="הדביקו רשימה — שורה או פסיק לכל פריט"></textarea></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button type="button" class="btn-secondary" id="pdPackBulkCancel">ביטול</button>
+          <button type="button" class="btn-primary" id="pdPackBulkSave">הוסף הכל</button>
         </div>
       </div>
       ${
@@ -510,6 +575,15 @@ function wireProjectDetailEvents(p) {
       if (!t) return;
       await upsert("task", { ...t, status: cb.checked ? "done" : "todo" });
     })
+  );
+
+  wireBulkAddToggle(
+    { btn: "pdShopBulkBtn", form: "pdShopBulkForm", textarea: "pd-shop-bulk-text", cancel: "pdShopBulkCancel", save: "pdShopBulkSave" },
+    (names) => bulkAddShoppingItems(names, "בית-אחר", p.id)
+  );
+  wireBulkAddToggle(
+    { btn: "pdPackBulkBtn", form: "pdPackBulkForm", textarea: "pd-pack-bulk-text", cancel: "pdPackBulkCancel", save: "pdPackBulkSave" },
+    (names) => bulkAddPackingItems(p.id, names)
   );
 
   document.querySelectorAll("[data-open-shop]").forEach((btn) =>

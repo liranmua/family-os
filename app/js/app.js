@@ -1,11 +1,12 @@
 // Family OS — נקודת כניסה: רישום Service Worker, טעינת state, חיווט UI.
 
 import { loadState, resetAll, upsert, state, setChangeHandler, setSyncHandler } from "./state.js";
-import { CATEGORY_LIST, todayStr } from "./constants.js";
+import { CATEGORY_LIST, todayStr, splitBulkText } from "./constants.js";
 import {
   renderAll, renderTasks, setCategoryFilter, getCategoryFilter, setTaskSearchQuery, setRoutineToggleHandler,
+  getActiveStoreType,
 } from "./render.js";
-import { openItemForm } from "./forms.js";
+import { openItemForm, bulkAddShoppingItems } from "./forms.js";
 import { initNotifications, setToastHandler, checkAll as checkNotifications } from "./notifications.js";
 import { toast } from "./toast.js";
 import { deviceLabel } from "./cloud.js";
@@ -181,6 +182,22 @@ function wireButtons() {
   });
 }
 
+// ---- הוספה מרובה לקניות (הדבקת רשימה, Family_OS_Bulk_Add_Brief.md) ----
+function wireShoppingBulkAdd() {
+  const btn = document.getElementById("shopBulkBtn");
+  const form = document.getElementById("shopBulkForm");
+  const textarea = document.getElementById("shopBulkText");
+  const close = () => { form.hidden = true; btn.hidden = false; textarea.value = ""; };
+  btn.addEventListener("click", () => { form.hidden = false; btn.hidden = true; textarea.focus(); });
+  document.getElementById("shopBulkCancel").addEventListener("click", close);
+  document.getElementById("shopBulkSave").addEventListener("click", async () => {
+    const names = splitBulkText(textarea.value);
+    if (!names.length) return;
+    await bulkAddShoppingItems(names, getActiveStoreType());
+    close();
+  });
+}
+
 // ---- Overlay: סגירה בלחיצה על הרקע / Escape ----
 function wireOverlay() {
   const overlay = document.getElementById("modalOverlay");
@@ -222,6 +239,7 @@ async function main() {
   wireNav();
   wireSidebar();
   wireButtons();
+  wireShoppingBulkAdd();
   wireTaskSearch();
   wireOverlay();
   wireAuth();

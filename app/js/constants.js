@@ -81,6 +81,16 @@ export function nextId(prefix, ids, width = 3) {
   return `${prefix}-${String(max + 1).padStart(width, "0")}`;
 }
 
+// הוספה מרובה (הדבקת רשימה): מפצל גם לפי שורה וגם לפי פסיק — כי רשימות אמיתיות
+// (ראו Family_OS_Bulk_Add_Brief.md) לפעמים כתובות כפסקה אחת עם פריטים מופרדים
+// בפסיקים, לא רק שורה-לפריט. חותך רווחים מיותרים, מתעלם מאיברים ריקים.
+export function splitBulkText(text) {
+  return String(text || "")
+    .split(/[\n,]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 // בריחת תווים ל-HTML (הדשבורד לא עשה את זה — כאן כן, כי הנתונים נשמרים ונטענים מחדש)
 export function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
