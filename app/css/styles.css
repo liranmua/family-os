@@ -213,7 +213,30 @@ tr.row-click { cursor: pointer; }
 tr.row-click:hover { background: #FAF9F6; }
 .chevron { color: var(--text-secondary); font-size: 15px; }
 .empty-row td { text-align: center; color: var(--text-secondary); font-style: italic; padding: 22px; }
-.cat-header-row td { background: #FAFAF8; color: var(--text-secondary); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; padding: 7px 12px; }
+/* ---- קטגוריות: accordion (Family_OS_Category_View_Brief.md, חלק ב') ----
+   שני מימושים לפי המבנה התחתי: שורת-כותרת בתוך טבלת הקניות (tr, בלי אנימציה —
+   שורות טבלה לא מתקפלות היטב), וכרטיס עצמאי ברשימת האריזה (div, עם אנימציית
+   max-height חלקה). שניהם חולקים את אותה שפה חזותית (חץ מסתובב + מונה פריטים). */
+.cat-header-row { cursor: pointer; user-select: none; }
+.cat-header-row td { background: #FAFAF8; color: var(--text-secondary); font-size: 11px; font-weight: 700; letter-spacing: .3px; padding: 8px 12px; }
+.cat-header-row:hover td { background: #F2F0EA; }
+.cat-arrow { display: inline-block; font-size: 9px; color: var(--accent-fin); transition: transform .2s ease; }
+.cat-header-row.open .cat-arrow, .cat-accordion-head.open .cat-arrow { transform: rotate(90deg); }
+.cat-header-row .cat-name { text-transform: uppercase; }
+.cat-count { display: inline-block; font-size: 10px; font-weight: 700; color: var(--text-secondary); background: rgba(154,160,166,.18); border-radius: 999px; padding: 1px 7px; margin-inline-start: 4px; }
+
+.cat-accordion { margin-bottom: 8px; }
+.cat-accordion-head {
+  width: 100%; display: flex; align-items: center; gap: 8px; text-align: right; font-family: inherit;
+  background: var(--bg-card); border: 1px solid #EFEBE3; border-radius: 10px; padding: 10px 14px;
+  font-size: 13px; font-weight: 700; color: var(--text-primary); cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+.cat-accordion-head:hover { background: #FAF9F6; }
+.cat-accordion-head .cat-count { margin-inline-start: auto; }
+.cat-accordion-body { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
+.cat-accordion-body.open { max-height: 3000px; }
+.cat-accordion-body .subtask-list { margin-top: 8px; }
+
 .inline-cat-input { width: 100%; min-width: 90px; padding: 5px 7px; border: 1px solid #E5E2DB; border-radius: 6px; font-size: 12.5px; font-family: inherit; background: #fff; color: var(--text-primary); }
 .inline-cat-input:focus { outline: 2px solid var(--accent-fin); outline-offset: 1px; }
 

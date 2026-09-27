@@ -338,9 +338,13 @@ function renderCalendarSettingsBody() {
 // ---- מסך פרויקט מלא (drill-in) ----
 
 let _openProjectId = null;
+// קטגוריות פתוחות ברשימת האריזה (accordion) — לא נשמר בין ביקורים, מתאפס
+// בכל כניסה מחדש לפרטי פרויקט (Family_OS_Category_View_Brief.md, חלק ב').
+let openPackCategories = new Set();
 
 export function openProjectDetail(projectId) {
   _openProjectId = projectId;
+  openPackCategories = new Set();
   showScreen("project-detail");
   renderProjectDetailBody();
 }
@@ -460,26 +464,35 @@ function renderProjectDetailBody() {
       ${
         packingItems.length
           ? `<div id="pdPackList">${groupByCategory(packingItems)
-              .map(
-                ({ category, items }) => `
-            <div class="ug-head" style="margin-top:10px">${esc(category)}</div>
-            <div class="subtask-list">${items
-              .map(
-                (it) => `
-            <div class="subtask-item ${it.packed ? "done" : ""}">
-              <input type="checkbox" data-pack-id="${esc(it.id)}" ${it.packed ? "checked" : ""} id="pdp-${esc(it.id)}">
-              <label for="pdp-${esc(it.id)}" style="flex:1;cursor:pointer">
-                <div class="stx-name">${esc(it.name)}</div>
-              </label>
-              <input type="text" class="inline-cat-input" list="packCategoryDatalist" data-cat-pack="${esc(it.id)}" value="${escAttr(it.category || "")}" placeholder="קטגוריה" style="max-width:110px">
-              <label class="pack-needbuy" style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--text-secondary);cursor:pointer">
-                <input type="checkbox" data-needbuy-pack="${esc(it.id)}" ${it.needsBuy ? "checked" : ""}> צריך לקנות
-              </label>
-              <button class="icon-edit-btn" data-del-pack="${esc(it.id)}" aria-label="הסרה">✕</button>
-            </div>`
-              )
-              .join("")}</div>`
-              )
+              .map(({ category, items }) => {
+                const isOpen = openPackCategories.has(category);
+                return `
+            <div class="cat-accordion">
+              <button type="button" class="cat-accordion-head ${isOpen ? "open" : ""}" data-pack-cat-toggle="${escAttr(category)}">
+                <span class="cat-arrow">▸</span>
+                <span class="cat-name">${esc(category)}</span>
+                <span class="cat-count">${items.length}</span>
+              </button>
+              <div class="cat-accordion-body ${isOpen ? "open" : ""}">
+                <div class="subtask-list">${items
+                  .map(
+                    (it) => `
+                <div class="subtask-item ${it.packed ? "done" : ""}">
+                  <input type="checkbox" data-pack-id="${esc(it.id)}" ${it.packed ? "checked" : ""} id="pdp-${esc(it.id)}">
+                  <label for="pdp-${esc(it.id)}" style="flex:1;cursor:pointer">
+                    <div class="stx-name">${esc(it.name)}</div>
+                  </label>
+                  <input type="text" class="inline-cat-input" list="packCategoryDatalist" data-cat-pack="${esc(it.id)}" value="${escAttr(it.category || "")}" placeholder="קטגוריה" style="max-width:110px">
+                  <label class="pack-needbuy" style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--text-secondary);cursor:pointer">
+                    <input type="checkbox" data-needbuy-pack="${esc(it.id)}" ${it.needsBuy ? "checked" : ""}> צריך לקנות
+                  </label>
+                  <button class="icon-edit-btn" data-del-pack="${esc(it.id)}" aria-label="הסרה">✕</button>
+                </div>`
+                  )
+                  .join("")}</div>
+              </div>
+            </div>`;
+              })
               .join("")}</div>`
           : `<div class="log-empty" id="pdNoPack">אין עדיין פריטים ברשימת האריזה</div>`
       }
@@ -635,6 +648,16 @@ function wireProjectDetailEvents(p) {
     btn.addEventListener("click", async () => {
       const packingItems = (p.packingItems || []).filter((it) => it.id !== btn.dataset.delPack);
       await upsert("project", { ...p, packingItems });
+    })
+  );
+  // Accordion קטגוריות ברשימת אריזה — מצב פתוח/סגור לא נשמר ב-state, רק ב-JS
+  // (מתאפס בכניסה הבאה ל-openProjectDetail), אז מספיק לרנדר מחדש רק את המסך הזה.
+  document.querySelectorAll("[data-pack-cat-toggle]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const cat = btn.dataset.packCatToggle;
+      if (openPackCategories.has(cat)) openPackCategories.delete(cat);
+      else openPackCategories.add(cat);
+      renderProjectDetailBody();
     })
   );
   // "צריך לקנות" על פריט אריזה: יוצר/מוחק אוטומטית פריט קניות מקושר (ראו חלק ג'

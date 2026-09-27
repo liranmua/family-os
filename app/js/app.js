@@ -4,7 +4,7 @@ import { loadState, resetAll, upsert, state, setChangeHandler, setSyncHandler } 
 import { CATEGORY_LIST, todayStr, splitBulkText } from "./constants.js";
 import {
   renderAll, renderTasks, setCategoryFilter, getCategoryFilter, setTaskSearchQuery, setRoutineToggleHandler,
-  getActiveStoreType,
+  getActiveStoreType, resetShopCategoryState,
 } from "./render.js";
 import { openItemForm, bulkAddShoppingItems } from "./forms.js";
 import { initNotifications, setToastHandler, checkAll as checkNotifications } from "./notifications.js";
@@ -13,7 +13,7 @@ import { deviceLabel } from "./cloud.js";
 import { initAuth, signIn, signOutUser, currentUserName } from "./auth.js";
 import { initCalendar } from "./calendar.js";
 import { initDrive } from "./drive.js";
-import { showScreen } from "./nav.js";
+import { showScreen, setScreenEnterHandler } from "./nav.js";
 
 const FILTER_CONTAINERS = ["filtersTasks", "filtersRoutines", "filtersProjects"];
 
@@ -235,6 +235,7 @@ async function main() {
   setSyncHandler(updateSyncLine);
   setRoutineToggleHandler(toggleRoutineToday);
   setToastHandler((title, body) => toast(body ? `${title} — ${body}` : title, 6000));
+  setScreenEnterHandler((name) => { if (name === "shopping") resetShopCategoryState(); });
 
   wireNav();
   wireSidebar();

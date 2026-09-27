@@ -382,6 +382,14 @@ function renderShopSubtotal(list) {
     ${withPrice.length < relevant.length ? `<span class="shop-subtotal-note">(${relevant.length - withPrice.length} בלי מחיר)</span>` : ""}`;
 }
 
+// קטגוריות פתוחות (accordion) — לא נשמר בין ביקורים, מתאפס בכל כניסה מחדש
+// למסך הקניות (Family_OS_Category_View_Brief.md, חלק ב') — ראו nav.js.
+let openShopCategories = new Set();
+export function resetShopCategoryState() {
+  openShopCategories = new Set();
+  renderShopping(); // המסך כבר עמד ברקע (hidden) — חייבים לרנדר מחדש כדי שהאיפוס ייראה בפועל
+}
+
 function shopRowHtml(s) {
   const lt = lineTotal(s);
   const proj = s.linkedProjectId ? state.projects.find((p) => p.id === s.linkedProjectId) : null;
@@ -404,7 +412,14 @@ export function renderShopping() {
   renderShopSubtotal(list);
   const rows = list.length
     ? groupByCategory(list)
-        .map(({ category, items }) => `<tr class="cat-header-row"><td colspan="8">${esc(category)}</td></tr>${items.map(shopRowHtml).join("")}`)
+        .map(({ category, items }) => {
+          const isOpen = openShopCategories.has(category);
+          const header = `
+        <tr class="cat-header-row ${isOpen ? "open" : ""}" data-cat-toggle="${esc(category)}" tabindex="0">
+          <td colspan="8"><span class="cat-arrow">▸</span> <span class="cat-name">${esc(category)}</span> <span class="cat-count">${items.length}</span></td>
+        </tr>`;
+          return header + (isOpen ? items.map(shopRowHtml).join("") : "");
+        })
         .join("")
     : `<tr class="empty-row"><td colspan="8">הרשימה "${esc(activeStoreType)}" ריקה — הוסיפו פריט עם הכפתור למעלה</td></tr>`;
 
@@ -418,6 +433,16 @@ export function renderShopping() {
     dl.innerHTML = cats.map((c) => `<option value="${esc(c)}">`).join("");
   }
 
+  document.querySelectorAll("#shopTable tr.cat-header-row").forEach((row) => {
+    const toggle = () => {
+      const cat = row.dataset.catToggle;
+      if (openShopCategories.has(cat)) openShopCategories.delete(cat);
+      else openShopCategories.add(cat);
+      renderShopping();
+    };
+    row.addEventListener("click", toggle);
+    row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+  });
   document.querySelectorAll("#shopTable tr.row-click").forEach((row) => {
     const open = () => openItemForm("shopping", row.dataset.shopId);
     row.addEventListener("click", (e) => { if (e.target.closest("input,select,textarea")) return; open(); });
