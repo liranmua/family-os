@@ -1,7 +1,38 @@
-// Family OS — Service Worker. app-shell cache ל-offline.
-// עדיין אין Push-שרת (סבב נפרד, ראו CLAUDE.md) — ה-notificationclick למטה מוכן לקראתו.
+// Family OS — Service Worker. app-shell cache ל-offline + Push אמיתי (סבב 2,
+// Family_OS_Notifications_Brief.md, מסלול ב'). אותו Service Worker קיים מטפל גם
+// בהתראות Push ברקע — לא קובץ firebase-messaging-sw.js נפרד — כי getToken() בצד
+// הלקוח (app/js/push.js) מקבל את ה-registration הזה ישירות (serviceWorkerRegistration).
+// importScripts (לא ES import) כי זהו Service Worker קלאסי, לא מודול.
 
-const CACHE = "family-os-v20";
+importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js");
+
+// firebaseConfig ציבורי-בכוונה (כמו ב-app/js/firebase.js) — מוכפל כאן כי Service
+// Worker קלאסי לא יכול לייבא מודול ES מהקובץ השני.
+firebase.initializeApp({
+  apiKey: "AIzaSyBV0Ix1RIXJN9xIlolT7pjflrCmZAvG6HI",
+  authDomain: "family-os-poc.firebaseapp.com",
+  projectId: "family-os-poc",
+  storageBucket: "family-os-poc.firebasestorage.app",
+  messagingSenderId: "670882998874",
+  appId: "1:670882998874:web:9d25c8bc70349dc92a8663",
+});
+
+const messaging = firebase.messaging();
+// scripts/send-push.mjs שולח הודעת data-only (לא "notification") בכוונה, כדי
+// שההצגה תמיד תעבור דרך כאן ותשתמש באותו notificationclick הקיים למטה — לא שני
+// מנגנוני-קליק נפרדים.
+messaging.onBackgroundMessage((payload) => {
+  const { title, body } = payload.data || {};
+  if (!title) return;
+  self.registration.showNotification(title, {
+    body: body || "",
+    icon: "./icons/icon-192.png",
+    badge: "./icons/icon-192.png",
+  });
+});
+
+const CACHE = "family-os-v21";
 const SHELL = [
   "./",
   "./index.html",
@@ -22,6 +53,7 @@ const SHELL = [
   "./js/nav.js",
   "./js/calendar.js",
   "./js/drive.js",
+  "./js/push.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",

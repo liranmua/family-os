@@ -13,6 +13,7 @@ import { deviceLabel } from "./cloud.js";
 import { initAuth, signIn, signOutUser, currentUserName } from "./auth.js";
 import { initCalendar } from "./calendar.js";
 import { initDrive } from "./drive.js";
+import { initPush } from "./push.js";
 import { showScreen, setScreenEnterHandler } from "./nav.js";
 
 const FILTER_CONTAINERS = ["filtersTasks", "filtersRoutines", "filtersProjects"];
@@ -261,6 +262,7 @@ async function main() {
 
   initCalendar(onStateChange).catch((e) => console.warn("initCalendar failed:", e));
   initDrive(onStateChange).catch((e) => console.warn("initDrive failed:", e));
+  initPush(swRegistration, onStateChange).catch((e) => console.warn("initPush failed:", e));
 }
 
 main();

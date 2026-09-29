@@ -1,0 +1,12 @@
+{
+  "name": "family-os-push",
+  "private": true,
+  "type": "module",
+  "description": "סקריפט מתוזמן (GitHub Actions) ששולח Push אמיתי דרך FCM — לא חלק מהאפליקציה עצמה (app/ נשארת ללא תלויות).",
+  "scripts": {
+    "send-push": "node scripts/send-push.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}

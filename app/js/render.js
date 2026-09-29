@@ -19,6 +19,7 @@ import {
   getLastError as calGetLastError, connectCalendar, fetchEvents as calFetchEvents, disconnectCalendar,
 } from "./calendar.js";
 import { getFolderId as driveGetFolderId, getFolderName as driveGetFolderName, getLastError as driveGetLastError, pickFolder as drivePickFolder } from "./drive.js";
+import { isPushSupported, isPushGranted, getPushError as pushGetError, enablePush } from "./push.js";
 
 let activeCategoryFilter = "";
 export function setCategoryFilter(v) { activeCategoryFilter = v; }
@@ -775,6 +776,33 @@ export function renderDriveSettings() {
   document.getElementById("drivePickFolderBtn").addEventListener("click", () => drivePickFolder());
 }
 
+// ---- התראות Push (סבב 2, Family_OS_Notifications_Brief.md, מסלול ב') ----
+
+export function renderPushSettings() {
+  const el = document.getElementById("pushSettingsBody");
+  if (!el) return;
+  if (!isPushSupported()) {
+    el.innerHTML = `<div class="log-empty" style="margin:0">הדפדפן הזה לא תומך בהתראות Push, או שהאפליקציה עדיין לא סיימה להיטען.</div>`;
+    return;
+  }
+  const err = pushGetError();
+  const granted = isPushGranted();
+
+  el.innerHTML = `
+    <div class="log-empty" style="margin-bottom:10px">
+      התראת מערכת אמיתית גם כשהאפליקציה סגורה — אותם שלושה טריגרים כמו ההתראות
+      הפנימיות (בלוק שבועי מתקרב, משימה עם יעד מתקרב, פריט קניות חדש). דורש חשבון
+      Google מחובר; יש לאשר את הרשאת הדפדפן.
+    </div>
+    ${err ? `<div class="field-error" style="margin-bottom:10px">${esc(err)}</div>` : ""}
+    <div class="toolbar-row" style="justify-content:space-between;align-items:center">
+      <span style="font-size:13px">${granted ? "✓ הופעל במכשיר הזה" : "עדיין לא הופעל במכשיר הזה"}</span>
+      <button class="icon-edit-btn" id="pushEnableBtn">${granted ? "רענון הרשמה" : "הפעלת התראות"}</button>
+    </div>`;
+
+  document.getElementById("pushEnableBtn").addEventListener("click", () => enablePush());
+}
+
 // ---- הכל ----
 
 let _onRoutineToggle = () => {};
@@ -789,6 +817,7 @@ export function renderAll() {
   renderShopping();
   renderPeople();
   renderDriveSettings();
+  renderPushSettings();
   renderCalendarScreen();
   refreshProjectDetailIfOpen();
 }

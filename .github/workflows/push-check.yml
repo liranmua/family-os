@@ -1,0 +1,29 @@
+name: Family OS push notifications
+
+# בדיוק אותו רעיון כמו pages.yml (תזמון GitHub Actions חינמי), רק שבמקום לפרסם
+# את האתר זה מריץ סקריפט Node שבודק Firestore ושולח Push דרך FCM כשמשהו "מתקרב"
+# (בלוק שבועי/משימה/פריט קניות — ראו scripts/send-push.mjs ו-
+# Family_OS_Notifications_Brief.md, סבב 2). עוקף את הדרישה לתוכנית Blaze של
+# Cloud Functions המתוזמנות של Firebase עצמו.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: family-os-push
+  cancel-in-progress: false
+
+jobs:
+  send-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: node scripts/send-push.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
