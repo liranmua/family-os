@@ -13,9 +13,8 @@ import { getMeta, setMeta } from "./state.js";
 
 // מפתח VAPID — לא סוד (ציבורי, כמו firebaseConfig ב-firebase.js), מ-Firebase
 // Console → Project settings → Cloud Messaging → Web configuration → Generate
-// key pair (ר' הבריף, מסלול א', צעד 3). עד שלירן מעביר את הערך האמיתי, כפתור
-// ההפעלה בהגדרות יציג הודעת שגיאה ברורה במקום להיכשל בשקט.
-const VAPID_KEY = "";
+// key pair (ר' הבריף, מסלול א', צעד 3).
+const VAPID_KEY = "BOyJ_SfBIiJtwMpOXutn2iWUoarUmYixhsvBTcLnuK6S2-xQkZ94jLhjgext15FwfziRpkfSi1k2TlZyuda55ak";
 
 let swReg = null;
 let onChange = () => {};
