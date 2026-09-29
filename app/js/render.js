@@ -405,23 +405,44 @@ function renderShopSubtotal(list) {
 let openShopCategories = new Set();
 export function resetShopCategoryState() {
   openShopCategories = new Set();
+  openShopDetails = new Set();
   activeShopView = "list"; // חזרה ל"רשימה" בכל כניסה מחדש למסך, כמו הקטגוריות
+  shopInventoryQuery = "";
+  openInvCategories = new Set();
   renderShopping(); // המסך כבר עמד ברקע (hidden) — חייבים לרנדר מחדש כדי שהאיפוס ייראה בפועל
 }
+
+// שדות משניים (מחיר/הערות/קביעת-קטגוריה) מוסתרים כברירת מחדל כדי לצמצם עומס
+// ויזואלי בזמן קנייה בפועל — נפתחים בלחיצה על "⋯" (Family_OS_Lists_UX_Brief.md).
+// מצב פתוח/סגור פר-פריט, מתאפס בכל כניסה מחדש למסך כמו הקטגוריות.
+let openShopDetails = new Set();
 
 function shopRowHtml(s) {
   const lt = lineTotal(s);
   const proj = s.linkedProjectId ? state.projects.find((p) => p.id === s.linkedProjectId) : null;
+  const isOpen = openShopDetails.has(s.id);
   return `
         <tr class="row-click" data-shop-id="${esc(s.id)}" tabindex="0">
           <td>${esc(s.name)}${proj ? `<span class="related-badge" style="margin-inline-start:6px">🧩 ${esc(proj.name)}</span>` : ""}</td>
-          <td><input type="text" class="inline-cat-input" list="shopCategoryDatalist" data-cat-shop="${esc(s.id)}" value="${esc(s.category || "")}" placeholder="קטגוריה"></td>
           <td>${esc(s.qty || "—")}</td>
-          <td>${s.price != null ? fmtMoney(s.price) : "—"}</td>
-          <td>${lt != null ? fmtMoney(lt) : "—"}</td>
-          <td>${esc(s.notes || "—")}</td>
           <td><span class="shop-pill shop-${esc(s.status)}">${esc(s.status)}</span></td>
-          <td><button type="button" class="btn-bought" data-buy-shop="${esc(s.id)}">✓ קניתי</button></td>
+          <td class="shop-actions-cell">
+            <button type="button" class="icon-edit-btn shop-detail-toggle ${isOpen ? "open" : ""}" data-toggle-shop-detail="${esc(s.id)}" aria-label="פרטים נוספים">⋯</button>
+            <button type="button" class="btn-bought" data-buy-shop="${esc(s.id)}">✓ קניתי</button>
+          </td>
+        </tr>
+        <tr class="shop-detail-row ${isOpen ? "open" : ""}" data-shop-detail-for="${esc(s.id)}">
+          <td colspan="4">
+            <div class="shop-detail-grid">
+              <label class="shop-detail-field">
+                <span>קטגוריה</span>
+                <input type="text" class="inline-cat-input" list="shopCategoryDatalist" data-cat-shop="${esc(s.id)}" value="${esc(s.category || "")}" placeholder="קטגוריה">
+              </label>
+              <div class="shop-detail-field"><span>מחיר</span><span>${s.price != null ? fmtMoney(s.price) : "—"}</span></div>
+              <div class="shop-detail-field"><span>סה״כ</span><span>${lt != null ? fmtMoney(lt) : "—"}</span></div>
+              <div class="shop-detail-field"><span>הערות</span><span>${esc(s.notes || "—")}</span></div>
+            </div>
+          </td>
         </tr>`;
 }
 
@@ -439,13 +460,68 @@ function invRowHtml(inv) {
         </div>`;
 }
 
+// חיפוש טקסט חופשי + קיבוץ-לפי-קטגוריה בקטלוג ה"מלאי" (Family_OS_Lists_UX_Brief.md,
+// סעיף 3) — קשה לאתר פריט בקטלוג ארוך בלי זה. חיפוש פעיל פותח אוטומטית כל קבוצה
+// שיש בה התאמה, כדי שהתוצאה תהיה גלויה בפועל גם דרך קבוצות מקופלות.
+let shopInventoryQuery = "";
+let openInvCategories = new Set();
+
 function renderShopInventory() {
   const body = document.getElementById("shopInventoryBody");
   if (!body) return;
-  const list = state.inventory.filter((i) => i.storeType === activeStoreType);
-  body.innerHTML = list.length
-    ? `<div class="subtask-list">${list.map(invRowHtml).join("")}</div>`
-    : `<div class="log-empty">אין עדיין פריטים במלאי הכללי של "${esc(activeStoreType)}" — פריטים ש"קניתם" יגיעו לכאן אוטומטית</div>`;
+
+  // שימור פוקוס/מיקום סמן בתיבת החיפוש — הפונקציה הזו מחליפה את כל ה-innerHTML
+  // בכל הקלדה (כדי לסנן בזמן אמת), מה שהיה הורס את הפוקוס בלי השמירה הזו.
+  const activeEl = document.activeElement;
+  const preserveSearch = activeEl && activeEl.id === "shopInvSearch";
+  const selStart = preserveSearch ? activeEl.selectionStart : null;
+  const selEnd = preserveSearch ? activeEl.selectionEnd : null;
+
+  const all = state.inventory.filter((i) => i.storeType === activeStoreType);
+  const q = shopInventoryQuery.trim().toLowerCase();
+  const filtered = q ? all.filter((i) => i.name.toLowerCase().includes(q)) : all;
+
+  const searchHtml = `<div class="shop-inv-search-wrap">
+    <input type="text" id="shopInvSearch" class="shop-inv-search" placeholder="🔎 חיפוש במלאי…" value="${esc(shopInventoryQuery)}">
+  </div>`;
+
+  let resultsHtml;
+  if (!all.length) {
+    resultsHtml = `<div class="log-empty">אין עדיין פריטים במלאי הכללי של "${esc(activeStoreType)}" — פריטים ש"קניתם" יגיעו לכאן אוטומטית</div>`;
+  } else if (q && !filtered.length) {
+    resultsHtml = `<div class="log-empty">אין התאמות ל"${esc(shopInventoryQuery)}"</div>`;
+  } else {
+    resultsHtml = groupByCategory(filtered)
+      .map(({ category, items }) => {
+        const isOpen = q ? true : openInvCategories.has(category);
+        return `
+          <div class="cat-accordion">
+            <button type="button" class="cat-accordion-head ${isOpen ? "open" : ""}" data-inv-cat-toggle="${esc(category)}">
+              <span class="cat-arrow">▸</span>
+              <span class="cat-name">${esc(category)}</span>
+              <span class="cat-count">${items.length}</span>
+            </button>
+            <div class="cat-accordion-body ${isOpen ? "open" : ""}">
+              <div class="subtask-list">${items.map(invRowHtml).join("")}</div>
+            </div>
+          </div>`;
+      })
+      .join("");
+  }
+
+  body.innerHTML = searchHtml + resultsHtml;
+
+  const searchInp = document.getElementById("shopInvSearch");
+  if (searchInp) {
+    searchInp.addEventListener("input", () => {
+      shopInventoryQuery = searchInp.value;
+      renderShopInventory();
+    });
+    if (preserveSearch) {
+      searchInp.focus();
+      try { searchInp.setSelectionRange(selStart, selEnd); } catch (_) {}
+    }
+  }
 
   body.querySelectorAll("[data-inv-add]").forEach((btn) =>
     btn.addEventListener("click", async () => {
@@ -457,6 +533,14 @@ function renderShopInventory() {
   );
   body.querySelectorAll("[data-inv-del]").forEach((btn) =>
     btn.addEventListener("click", () => remove("inventoryItem", btn.dataset.invDel))
+  );
+  body.querySelectorAll("[data-inv-cat-toggle]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const cat = btn.dataset.invCatToggle;
+      if (openInvCategories.has(cat)) openInvCategories.delete(cat);
+      else openInvCategories.add(cat);
+      renderShopInventory();
+    })
   );
 }
 
@@ -478,15 +562,15 @@ export function renderShopping() {
           const isOpen = openShopCategories.has(category);
           const header = `
         <tr class="cat-header-row ${isOpen ? "open" : ""}" data-cat-toggle="${esc(category)}" tabindex="0">
-          <td colspan="8"><span class="cat-arrow">▸</span> <span class="cat-name">${esc(category)}</span> <span class="cat-count">${items.length}</span></td>
+          <td colspan="4"><span class="cat-arrow">▸</span> <span class="cat-name">${esc(category)}</span> <span class="cat-count">${items.length}</span></td>
         </tr>`;
           return header + (isOpen ? items.map(shopRowHtml).join("") : "");
         })
         .join("")
-    : `<tr class="empty-row"><td colspan="8">הרשימה "${esc(activeStoreType)}" ריקה — הוסיפו פריט עם הכפתור למעלה</td></tr>`;
+    : `<tr class="empty-row"><td colspan="4">הרשימה "${esc(activeStoreType)}" ריקה — הוסיפו פריט עם הכפתור למעלה</td></tr>`;
 
   document.getElementById("shopTable").innerHTML = `
-    <thead><tr><th>פריט</th><th>קטגוריה</th><th>כמות</th><th>מחיר</th><th>סה״כ</th><th>הערות</th><th>סטטוס</th><th></th></tr></thead>
+    <thead><tr><th>פריט</th><th>כמות</th><th>סטטוס</th><th></th></tr></thead>
     <tbody>${rows}</tbody>`;
 
   const dl = document.getElementById("shopCategoryDatalist");
@@ -522,6 +606,15 @@ export function renderShopping() {
       e.stopPropagation();
       const s = state.shopping.find((x) => x.id === btn.dataset.buyShop);
       if (s) markShoppingItemBought(s);
+    });
+  });
+  document.querySelectorAll("#shopTable [data-toggle-shop-detail]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.toggleShopDetail;
+      if (openShopDetails.has(id)) openShopDetails.delete(id);
+      else openShopDetails.add(id);
+      renderShopping();
     });
   });
 }

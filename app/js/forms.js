@@ -377,10 +377,16 @@ let _openProjectId = null;
 // קטגוריות פתוחות ברשימת האריזה (accordion) — לא נשמר בין ביקורים, מתאפס
 // בכל כניסה מחדש לפרטי פרויקט (Family_OS_Category_View_Brief.md, חלק ב').
 let openPackCategories = new Set();
+// אותו דפוס עבור "פריטי קניות לפרויקט" (Family_OS_Lists_UX_Brief.md) — קיבוץ לפי
+// קטגוריה + שדה "קביעה מהירה" נגיש בלחיצה, בעקביות עם שאר הרשימות.
+let openShopProjCategories = new Set();
+let openShopProjDetails = new Set();
 
 export function openProjectDetail(projectId) {
   _openProjectId = projectId;
   openPackCategories = new Set();
+  openShopProjCategories = new Set();
+  openShopProjDetails = new Set();
   showScreen("project-detail");
   renderProjectDetailBody();
 }
@@ -390,6 +396,75 @@ export function refreshProjectDetailIfOpen() {
   if (_openProjectId && state.projects.some((p) => p.id === _openProjectId)) renderProjectDetailBody();
 }
 
+// ---- "פריטי קניות לפרויקט" — מקובץ לפי קטגוריה, שדה "קביעה מהירה" נגיש בלחיצה
+// (Family_OS_Lists_UX_Brief.md, סעיף 1+2) ----
+function shopProjRowHtml(s) {
+  const isOpen = openShopProjDetails.has(s.id);
+  return `
+    <div class="subtask-item">
+      <div style="flex:1;min-width:0">
+        <div class="stx-name">${esc(s.name)}</div>
+        <div class="stx-note">${esc(s.storeType)}${s.qty ? " · " + esc(s.qty) : ""}</div>
+      </div>
+      <button type="button" class="icon-edit-btn shop-detail-toggle ${isOpen ? "open" : ""}" data-toggle-shopproj-detail="${esc(s.id)}" aria-label="פרטים נוספים">⋯</button>
+      <button type="button" class="btn-bought" data-buy-shop="${esc(s.id)}">✓ קניתי</button>
+      <button class="icon-edit-btn" data-open-shop="${esc(s.id)}" aria-label="פתיחת הפריט">↗</button>
+    </div>
+    <div class="shop-detail-inline ${isOpen ? "open" : ""}">
+      <input type="text" class="inline-cat-input" list="shopCategoryDatalist" data-cat-shop="${esc(s.id)}" value="${escAttr(s.category || "")}" placeholder="קטגוריה">
+    </div>`;
+}
+
+function shopProjCategoryGroupHtml(category, items) {
+  const isOpen = openShopProjCategories.has(category);
+  return `
+    <div class="cat-accordion">
+      <button type="button" class="cat-accordion-head ${isOpen ? "open" : ""}" data-shopproj-cat-toggle="${escAttr(category)}">
+        <span class="cat-arrow">▸</span>
+        <span class="cat-name">${esc(category)}</span>
+        <span class="cat-count">${items.length}</span>
+      </button>
+      <div class="cat-accordion-body ${isOpen ? "open" : ""}">
+        <div class="subtask-list">${items.map(shopProjRowHtml).join("")}</div>
+      </div>
+    </div>`;
+}
+
+// ---- רשימת אריזה — "ארוז" מקפל לקבוצה משותפת אחת בתחתית הרשימה, לא נמחק
+// ולא משנה רק סטטוס (Family_OS_Lists_UX_Brief.md, סעיף 4). "צריך לקנות" נשאר
+// לגמרי בלתי-תלוי — ראו wireProjectDetailEvents. ----
+const PACKED_GROUP_KEY = "__packed__";
+
+function packRowHtml(it) {
+  return `
+    <div class="subtask-item ${it.packed ? "done" : ""}">
+      <input type="checkbox" data-pack-id="${esc(it.id)}" ${it.packed ? "checked" : ""} id="pdp-${esc(it.id)}">
+      <label for="pdp-${esc(it.id)}" style="flex:1;cursor:pointer">
+        <div class="stx-name">${esc(it.name)}</div>
+      </label>
+      <input type="text" class="inline-cat-input" list="packCategoryDatalist" data-cat-pack="${esc(it.id)}" value="${escAttr(it.category || "")}" placeholder="קטגוריה" style="max-width:110px">
+      <label class="pack-needbuy" style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--text-secondary);cursor:pointer">
+        <input type="checkbox" data-needbuy-pack="${esc(it.id)}" ${it.needsBuy ? "checked" : ""}> צריך לקנות
+      </label>
+      <button class="icon-edit-btn" data-del-pack="${esc(it.id)}" aria-label="הסרה">✕</button>
+    </div>`;
+}
+
+function packCategoryGroupHtml(label, items, toggleKey = label) {
+  const isOpen = openPackCategories.has(toggleKey);
+  return `
+    <div class="cat-accordion">
+      <button type="button" class="cat-accordion-head ${isOpen ? "open" : ""}" data-pack-cat-toggle="${escAttr(toggleKey)}">
+        <span class="cat-arrow">▸</span>
+        <span class="cat-name">${esc(label)}</span>
+        <span class="cat-count">${items.length}</span>
+      </button>
+      <div class="cat-accordion-body ${isOpen ? "open" : ""}">
+        <div class="subtask-list">${items.map(packRowHtml).join("")}</div>
+      </div>
+    </div>`;
+}
+
 function renderProjectDetailBody() {
   const p = state.projects.find((x) => x.id === _openProjectId);
   if (!p) return;
@@ -397,6 +472,11 @@ function renderProjectDetailBody() {
   const linkedTasks = state.tasks.filter((t) => t.projectId === p.id);
   const linkedShopping = state.shopping.filter((s) => s.linkedProjectId === p.id);
   const packingItems = p.packingItems || [];
+  // "ארוז" מקפל פריט לקבוצה משותפת אחת בתחתית הרשימה, לא מוחק/מסתיר אותו
+  // (Family_OS_Lists_UX_Brief.md, סעיף 4) — פיצול לפני הקיבוץ-לפי-קטגוריה כדי
+  // שפריט ארוז לא יופיע גם בקבוצת הקטגוריה שלו וגם בקבוצת "✓ ארוז".
+  const unpackedPackingItems = packingItems.filter((it) => !it.packed);
+  const packedPackingItems = packingItems.filter((it) => it.packed);
   const places = p.places || [];
   const log = state.updatesLog.filter((u) => u.entityType === "project" && u.entityId === p.id);
   const links = p.links || [];
@@ -454,18 +534,8 @@ function renderProjectDetailBody() {
       </div>
       ${
         linkedShopping.length
-          ? `<div class="subtask-list" id="pdShopList">${linkedShopping
-              .map(
-                (s) => `
-            <div class="subtask-item">
-              <div style="flex:1">
-                <div class="stx-name">${esc(s.name)}</div>
-                <div class="stx-note">${esc(s.storeType)}${s.qty ? " · " + esc(s.qty) : ""}</div>
-              </div>
-              <button type="button" class="btn-bought" data-buy-shop="${esc(s.id)}">✓ קניתי</button>
-              <button class="icon-edit-btn" data-open-shop="${esc(s.id)}" aria-label="פתיחת הפריט">↗</button>
-            </div>`
-              )
+          ? `<div id="pdShopList">${groupByCategory(linkedShopping)
+              .map(({ category, items }) => shopProjCategoryGroupHtml(category, items))
               .join("")}</div>`
           : `<p style="font-size:13px;color:var(--text-secondary);font-style:italic">אין עדיין פריטי קניות מתויגים לפרויקט הזה</p>`
       }
@@ -499,37 +569,9 @@ function renderProjectDetailBody() {
       <datalist id="packCategoryDatalist">${packingCategoryOptions().map((c) => `<option value="${escAttr(c)}">`).join("")}</datalist>
       ${
         packingItems.length
-          ? `<div id="pdPackList">${groupByCategory(packingItems)
-              .map(({ category, items }) => {
-                const isOpen = openPackCategories.has(category);
-                return `
-            <div class="cat-accordion">
-              <button type="button" class="cat-accordion-head ${isOpen ? "open" : ""}" data-pack-cat-toggle="${escAttr(category)}">
-                <span class="cat-arrow">▸</span>
-                <span class="cat-name">${esc(category)}</span>
-                <span class="cat-count">${items.length}</span>
-              </button>
-              <div class="cat-accordion-body ${isOpen ? "open" : ""}">
-                <div class="subtask-list">${items
-                  .map(
-                    (it) => `
-                <div class="subtask-item ${it.packed ? "done" : ""}">
-                  <input type="checkbox" data-pack-id="${esc(it.id)}" ${it.packed ? "checked" : ""} id="pdp-${esc(it.id)}">
-                  <label for="pdp-${esc(it.id)}" style="flex:1;cursor:pointer">
-                    <div class="stx-name">${esc(it.name)}</div>
-                  </label>
-                  <input type="text" class="inline-cat-input" list="packCategoryDatalist" data-cat-pack="${esc(it.id)}" value="${escAttr(it.category || "")}" placeholder="קטגוריה" style="max-width:110px">
-                  <label class="pack-needbuy" style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--text-secondary);cursor:pointer">
-                    <input type="checkbox" data-needbuy-pack="${esc(it.id)}" ${it.needsBuy ? "checked" : ""}> צריך לקנות
-                  </label>
-                  <button class="icon-edit-btn" data-del-pack="${esc(it.id)}" aria-label="הסרה">✕</button>
-                </div>`
-                  )
-                  .join("")}</div>
-              </div>
-            </div>`;
-              })
-              .join("")}</div>`
+          ? `<div id="pdPackList">${groupByCategory(unpackedPackingItems)
+              .map(({ category, items }) => packCategoryGroupHtml(category, items))
+              .join("")}${packedPackingItems.length ? packCategoryGroupHtml("✓ ארוז", packedPackingItems, PACKED_GROUP_KEY) : ""}</div>`
           : `<div class="log-empty" id="pdNoPack">אין עדיין פריטים ברשימת האריזה</div>`
       }
     </div>
@@ -653,6 +695,29 @@ function wireProjectDetailEvents(p) {
     btn.addEventListener("click", async () => {
       const s = state.shopping.find((x) => x.id === btn.dataset.buyShop);
       if (s) await markShoppingItemBought(s);
+    })
+  );
+  document.querySelectorAll("#pdShopList input[data-cat-shop]").forEach((inp) =>
+    inp.addEventListener("change", async () => {
+      const s = state.shopping.find((x) => x.id === inp.dataset.catShop);
+      if (!s) return;
+      await upsert("shopping", { ...s, category: inp.value.trim() || null });
+    })
+  );
+  document.querySelectorAll("#pdShopList [data-toggle-shopproj-detail]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.toggleShopprojDetail;
+      if (openShopProjDetails.has(id)) openShopProjDetails.delete(id);
+      else openShopProjDetails.add(id);
+      renderProjectDetailBody();
+    })
+  );
+  document.querySelectorAll("#pdShopList [data-shopproj-cat-toggle]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const cat = btn.dataset.shopprojCatToggle;
+      if (openShopProjCategories.has(cat)) openShopProjCategories.delete(cat);
+      else openShopProjCategories.add(cat);
+      renderProjectDetailBody();
     })
   );
 

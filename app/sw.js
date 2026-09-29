@@ -32,7 +32,7 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-const CACHE = "family-os-v21";
+const CACHE = "family-os-v22";
 const SHELL = [
   "./",
   "./index.html",
