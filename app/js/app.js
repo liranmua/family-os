@@ -6,7 +6,7 @@ import {
   renderAll, renderTasks, setCategoryFilter, getCategoryFilter, setTaskSearchQuery, setRoutineToggleHandler,
   getActiveStoreType, resetShopCategoryState,
 } from "./render.js";
-import { openItemForm, bulkAddShoppingItems } from "./forms.js";
+import { openItemForm, bulkAddShoppingItems, migrateLegacyInStockShoppingItems } from "./forms.js";
 import { initNotifications, setToastHandler, checkAll as checkNotifications } from "./notifications.js";
 import { toast } from "./toast.js";
 import { deviceLabel } from "./cloud.js";
@@ -219,6 +219,7 @@ function announceMigration() {
 }
 
 let _lastCats = "";
+let _migratedLegacyStock = false;
 function onStateChange() {
   renderAll();
   updateSyncLine();
@@ -226,6 +227,11 @@ function onStateChange() {
   // רענון רשימת הפילטר אם נוספו/נעלמו תחומים
   const cats = [...new Set(state.tasks.map((t) => t.category))].filter(Boolean).sort().join("|");
   if (cats !== _lastCats) { _lastCats = cats; wireFilters(); }
+  // מיגרציה חד-פעמית: פריטים "במלאי" מהסטטוס הישן שבוטל -> מלאי כללי (Family_OS_Shopping_Inventory_Brief.md)
+  if (!_migratedLegacyStock && state.sync.ready) {
+    _migratedLegacyStock = true;
+    migrateLegacyInStockShoppingItems().catch((e) => console.warn("legacy stock migration failed:", e));
+  }
 }
 
 async function main() {

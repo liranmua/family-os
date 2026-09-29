@@ -42,7 +42,9 @@ export const TYPE_META = {
 
 export const PRIORITY_OPTIONS = ["דחוף", "רגיל", "נמוך"];
 export const FREQUENCY_OPTIONS = ["חד-פעמי", "שבועי", "חודשי"];
-export const SHOP_STATUS_OPTIONS = ["חסר", "בעגלה", "במלאי"];
+// "במלאי" בוטל לגמרי (Family_OS_Shopping_Inventory_Brief.md) — "✓ קניתי" מוחק
+// את הפריט מהרשימה הפעילה ומעביר אותו ל"מלאי כללי" (state.inventory), לא סטטוס.
+export const SHOP_STATUS_OPTIONS = ["חסר", "בעגלה"];
 // שלוש רשימות קניות נפרדות (Family_OS_Shopping_Brief.md, סבב 1). "סופר" תקבל בהמשך
 // (סבב 2) זיכרון פריטים חוזרים — לא חלק מהסבב הזה.
 export const SHOP_STORE_TYPES = ["סופר", "סופר-פארם", "בית-אחר"];

@@ -3,7 +3,7 @@
 
 import { state, upsert, remove, saveFinance } from "./state.js";
 import { deviceLabel } from "./cloud.js";
-import { toast as showToast } from "./toast.js";
+import { toast as showToast, showUndoToast } from "./toast.js";
 import {
   CATEGORY_LIST, ASSIGNABLE_NAMES, ALL_PEOPLE_NAMES, STATUS_LABEL, STATUS_CLASS, STATUS_ORDER,
   TYPE_META, PRIORITY_OPTIONS, FREQUENCY_OPTIONS, SHOP_STATUS_OPTIONS, SHOP_STORE_TYPES,
@@ -72,6 +72,42 @@ export async function bulkAddPackingItems(projectId, names) {
     created.push({ id, name, packed: false });
   }
   await upsert("project", { ...p, packingItems: [...(p.packingItems || []), ...created] });
+}
+
+// ---- "מלאי כללי" (Family_OS_Shopping_Inventory_Brief.md) ----
+// "✓ קניתי" מוחק את הפריט מהרשימה הפעילה (לא רק משנה סטטוס) ומעביר אותו לקטלוג
+// לתוספת מהירה, נפרד לכל סוג חנות — דה-דופ לפי שם (בלי הבדל רישיות/רווחים).
+const normName = (s) => String(s || "").trim().toLowerCase();
+
+async function addToInventoryAndDeleteShoppingItem(item) {
+  const dup = state.inventory.find(
+    (x) => (x.storeType || "") === (item.storeType || "") && normName(x.name) === normName(item.name)
+  );
+  let createdId = null;
+  if (!dup) {
+    const inv = await upsert("inventoryItem", { name: item.name, category: item.category || null, storeType: item.storeType });
+    createdId = inv.id;
+  }
+  await remove("shopping", item.id);
+  return createdId;
+}
+
+// הפעולה שמופעלת מכפתור "✓ קניתי" בפועל — עם toast "בטל" (רשת ביטחון, כי זו
+// עכשיו מחיקה אמיתית מהרשימה הפעילה, לא סימון-סטטוס הפיך כמו קודם).
+export async function markShoppingItemBought(item) {
+  const createdId = await addToInventoryAndDeleteShoppingItem(item);
+  showUndoToast(`✓ נקנה: ${item.name}`, async () => {
+    await upsert("shopping", item); // משחזר את הפריט המקורי (אותו id ושדות)
+    if (createdId) await remove("inventoryItem", createdId); // רק אם זו רשומת קטלוג חדשה שנוצרה כרגע — לא רשומה שכבר הייתה קיימת
+  });
+}
+
+// מיגרציה חד-פעמית (רצה בפועל, לא רק תיאורטית): פריטים שכבר מסומנים "במלאי"
+// מהסטטוס הישן שבוטל עוברים לקטלוג באופן שקט, בלי toast "בטל" (זו לא פעולת
+// משתמש בודדת) — נקראת פעם אחת אחרי הטעינה הראשונה, ר' app.js.
+export async function migrateLegacyInStockShoppingItems() {
+  const legacy = state.shopping.filter((s) => s.status === "במלאי");
+  for (const s of legacy) await addToInventoryAndDeleteShoppingItem(s);
 }
 
 // ---- מודאל פירוט משימה ----
@@ -421,12 +457,12 @@ function renderProjectDetailBody() {
           ? `<div class="subtask-list" id="pdShopList">${linkedShopping
               .map(
                 (s) => `
-            <div class="subtask-item ${s.status === "במלאי" ? "done" : ""}">
-              <input type="checkbox" data-shop-id="${esc(s.id)}" ${s.status === "במלאי" ? "checked" : ""} id="pds-${esc(s.id)}">
-              <label for="pds-${esc(s.id)}" style="flex:1;cursor:pointer">
+            <div class="subtask-item">
+              <div style="flex:1">
                 <div class="stx-name">${esc(s.name)}</div>
                 <div class="stx-note">${esc(s.storeType)}${s.qty ? " · " + esc(s.qty) : ""}</div>
-              </label>
+              </div>
+              <button type="button" class="btn-bought" data-buy-shop="${esc(s.id)}">✓ קניתי</button>
               <button class="icon-edit-btn" data-open-shop="${esc(s.id)}" aria-label="פתיחת הפריט">↗</button>
             </div>`
               )
@@ -613,11 +649,10 @@ function wireProjectDetailEvents(p) {
   document.querySelectorAll("[data-open-shop]").forEach((btn) =>
     btn.addEventListener("click", () => openItemForm("shopping", btn.dataset.openShop))
   );
-  document.querySelectorAll("#pdShopList input[type=checkbox]").forEach((cb) =>
-    cb.addEventListener("change", async () => {
-      const s = state.shopping.find((x) => x.id === cb.dataset.shopId);
-      if (!s) return;
-      await upsert("shopping", { ...s, status: cb.checked ? "במלאי" : "חסר" });
+  document.querySelectorAll("#pdShopList [data-buy-shop]").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      const s = state.shopping.find((x) => x.id === btn.dataset.buyShop);
+      if (s) await markShoppingItemBought(s);
     })
   );
 
@@ -681,8 +716,10 @@ function wireProjectDetailEvents(p) {
         const packingItems = items.map((x) => (x.id === it.id ? { ...x, needsBuy: true, linkedShoppingId: shopItem.id } : x));
         await upsert("project", { ...p, packingItems });
       } else {
+        // עדיין קיים ברשימת הקניות = עדיין לא נקנה בפועל (אחרי "✓ קניתי" הפריט נמחק
+        // משם לגמרי, לא רק משנה סטטוס — ראו Family_OS_Shopping_Inventory_Brief.md).
         const linked = it.linkedShoppingId ? state.shopping.find((s) => s.id === it.linkedShoppingId) : null;
-        if (linked && linked.status !== "במלאי") await remove("shopping", linked.id); // עדיין לא נקנה בפועל — מוחקים
+        if (linked) await remove("shopping", linked.id);
         const packingItems = items.map((x) => (x.id === it.id ? { ...x, needsBuy: false, linkedShoppingId: null } : x));
         await upsert("project", { ...p, packingItems });
       }

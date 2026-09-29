@@ -253,7 +253,6 @@ tr.row-click:hover { background: #FAF9F6; }
 .shop-pill { font-size: 11px; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
 .shop-חסר { background: rgba(214,69,69,.14); color: #9A2b2b; }
 .shop-בעגלה { background: rgba(217,142,4,.16); color: #7A5B00; }
-.shop-במלאי { background: rgba(47,158,88,.15); color: #1f6b3b; }
 
 .log-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .log-entry { font-size: 12.5px; color: var(--text-primary); background: #F5F4F1; border-radius: 8px; padding: 8px 10px; }
@@ -290,6 +289,8 @@ tr.row-click:hover { background: #FAF9F6; }
 .btn-danger-text { background: none; border: none; color: var(--danger); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 9px 4px; }
 .icon-edit-btn { background: none; border: 1px solid #E5E2DB; border-radius: 8px; cursor: pointer; font-size: 13px; padding: 5px 9px; color: var(--text-secondary); font-family: inherit; flex-shrink: 0; }
 .icon-edit-btn:hover { background: #FAF9F6; }
+.btn-bought { background: rgba(47,158,88,.12); color: #1f6b3b; border: 1px solid rgba(47,158,88,.3); border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.btn-bought:hover { background: rgba(47,158,88,.22); }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(35,40,45,.5); display: flex; align-items: flex-start; justify-content: center; padding: 48px 16px; z-index: 50; overflow-y: auto; }
 .modal-overlay[hidden] { display: none; }
@@ -331,8 +332,9 @@ tr.row-click:hover { background: #FAF9F6; }
 .field-error { color: var(--danger); font-size: 12px; margin-top: -8px; margin-bottom: 10px; }
 .field-error[hidden] { display: none; }
 
-.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--bg-header); color: #fff; padding: 10px 20px; border-radius: 999px; font-size: 13px; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.2); z-index: 60; }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--bg-header); color: #fff; padding: 10px 20px; border-radius: 999px; font-size: 13px; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.2); z-index: 60; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
 .toast[hidden] { display: none; }
+.toast-undo-btn { background: none; border: none; color: #fff; font-family: inherit; font-size: 13px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 0; }
 
 @media (prefers-reduced-motion: no-preference) {
   .modal { animation: modal-in .16s ease-out; }

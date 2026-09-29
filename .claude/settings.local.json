@@ -43,7 +43,12 @@
       "Bash(firebase firestore:delete \"families/test_fix1\" --recursive --force --project family-os-poc)",
       "Bash(firebase firestore:delete \"families/test_shop1\" --recursive --force --project family-os-poc)",
       "Bash(firebase firestore:delete \"families/test_cal1\" --recursive --force --project family-os-poc)",
-      "Bash(firebase firestore:delete \"families/test_cal2\" --recursive --force --project family-os-poc)"
+      "Bash(firebase firestore:delete \"families/test_cal2\" --recursive --force --project family-os-poc)",
+      "Bash(firebase firestore:delete --recursive --force \"families/test_sidebar_round\" --project family-os-poc)",
+      "Bash(firebase firestore:delete --recursive --force \"families/test_notifications_round\" --project family-os-poc)",
+      "Bash(git commit -m ' *)",
+      "Bash(node -e \"const fs=require\\('fs'\\); const p=process.env.USERPROFILE+'/.config/configstore/firebase-tools.json'; const j=JSON.parse\\(fs.readFileSync\\(p,'utf8'\\)\\); console.log\\(Object.keys\\(j\\)\\); console.log\\(j.user ? Object.keys\\(j.user\\) : null\\); console.log\\(j.tokens ? Object.keys\\(j.tokens\\) : null\\);\")",
+      "Bash(firebase firestore:delete --recursive --force \"families/test_proj_tag_round\" --project family-os-poc)"
     ]
   }
 }

@@ -17,6 +17,7 @@ export const state = {
   shopping: [],
   updatesLog: [],
   weeklyBlocks: [],
+  inventory: [], // "מלאי כללי" — קטלוג שמות לתוספת מהירה, לא מעקב כמויות (Family_OS_Shopping_Inventory_Brief.md)
   finance: { ...FINANCE_DEFAULT },
   sync: { ready: false, fromCache: true, pending: false, migration: null },
 };
@@ -24,15 +25,16 @@ export const state = {
 const ENT = {
   task: "tasks", routine: "routines", project: "projects",
   shopping: "shopping", routineCompletion: "routineCompletions", update: "updatesLog",
-  weeklyBlock: "weeklyBlocks",
+  weeklyBlock: "weeklyBlocks", inventoryItem: "inventory",
 };
-const PREFIX = { tasks: "TSK", routines: "ROU", projects: "PRJ", shopping: "SHP", updatesLog: "UPD", weeklyBlocks: "WKB" };
+const PREFIX = { tasks: "TSK", routines: "ROU", projects: "PRJ", shopping: "SHP", updatesLog: "UPD", weeklyBlocks: "WKB", inventory: "INV" };
 
 function byId(a, b) { return String(a.id).localeCompare(String(b.id)); }
 const SORTERS = {
   tasks: byId, routines: byId, projects: byId, updatesLog: byId, shopping: byId,
   routineCompletions: (a, b) => String(a.date || "").localeCompare(String(b.date || "")),
   weeklyBlocks: (a, b) => (a.dayOfWeek - b.dayOfWeek) || String(a.startTime || "").localeCompare(String(b.startTime || "")),
+  inventory: (a, b) => String(a.name || "").localeCompare(String(b.name || ""), "he"),
 };
 
 let _onChange = () => {};

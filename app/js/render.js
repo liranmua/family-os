@@ -1,14 +1,16 @@
 // Family OS — פונקציות render. קוראות מ-state, לא משנות אותו.
 // מבוסס family_hub_dashboard.html.
 
-import { state, upsert } from "./state.js";
+import { state, upsert, remove } from "./state.js";
 import {
   CATEGORY_COLOR, PEOPLE, ASSIGNABLE_NAMES, EMAIL_TO_NAME, STATUS_LABEL, STATUS_CLASS, TYPE_META, SHOP_STORE_TYPES, DAY_NAMES,
   formatDateDisplay, todayStr, esc,
 } from "./constants.js";
+import { deviceLabel } from "./cloud.js";
+import { toast as showToast } from "./toast.js";
 import {
   openItemForm, openTaskDetail, openUpdateForm, openFinanceForm,
-  openProjectDetail, refreshProjectDetailIfOpen, openCalendarSettingsForm,
+  openProjectDetail, refreshProjectDetailIfOpen, openCalendarSettingsForm, markShoppingItemBought,
 } from "./forms.js";
 import { showScreen } from "./nav.js";
 import { currentUser } from "./auth.js";
@@ -345,7 +347,7 @@ function renderStoreTabs() {
   const tabsEl = document.getElementById("storeTabs");
   if (!tabsEl) return;
   tabsEl.innerHTML = SHOP_STORE_TYPES.map((st) => {
-    const count = state.shopping.filter((s) => itemStoreType(s) === st && s.status !== "במלאי").length;
+    const count = state.shopping.filter((s) => itemStoreType(s) === st).length;
     return `
       <button class="store-tab ${st === activeStoreType ? "active" : ""}" data-store-tab="${esc(st)}">
         ${esc(st)}${count ? `<span class="store-tab-count">${count}</span>` : ""}
@@ -353,6 +355,22 @@ function renderStoreTabs() {
   }).join("");
   tabsEl.querySelectorAll("[data-store-tab]").forEach((btn) =>
     btn.addEventListener("click", () => { setActiveStoreType(btn.dataset.storeTab); renderShopping(); })
+  );
+}
+
+// "רשימה" (הרשימה הפעילה, כמו היום) מול "מלאי" (קטלוג לתוספת מהירה, לאותו סוג
+// חנות) — Family_OS_Shopping_Inventory_Brief.md. אין "זכירה" בין ביקורים; פשוט
+// חוזר ל"רשימה" בכל כניסה מחדש למסך, כמו ה-accordion, דרך אותו מנגנון איפוס.
+let activeShopView = "list"; // "list" | "inventory"
+
+function renderShopViewTabs() {
+  const el = document.getElementById("shopViewTabs");
+  if (!el) return;
+  el.innerHTML = `
+    <button class="store-tab ${activeShopView === "list" ? "active" : ""}" data-shop-view="list">🛒 רשימה</button>
+    <button class="store-tab ${activeShopView === "inventory" ? "active" : ""}" data-shop-view="inventory">📦 מלאי</button>`;
+  el.querySelectorAll("[data-shop-view]").forEach((btn) =>
+    btn.addEventListener("click", () => { activeShopView = btn.dataset.shopView; renderShopping(); })
   );
 }
 
@@ -372,14 +390,13 @@ function fmtMoney(n) {
 function renderShopSubtotal(list) {
   const el = document.getElementById("shopSubtotal");
   if (!el) return;
-  const relevant = list.filter((s) => s.status !== "במלאי");
-  if (!relevant.length) { el.innerHTML = ""; return; }
-  const withPrice = relevant.filter((s) => s.price != null);
+  if (!list.length) { el.innerHTML = ""; return; }
+  const withPrice = list.filter((s) => s.price != null);
   const total = withPrice.reduce((sum, s) => sum + (lineTotal(s) || 0), 0);
   el.innerHTML = `
-    <span class="shop-subtotal-label">סך הכל לרשימה (לא כולל "במלאי")</span>
+    <span class="shop-subtotal-label">סך הכל לרשימה</span>
     <span class="shop-subtotal-value">${fmtMoney(total)}</span>
-    ${withPrice.length < relevant.length ? `<span class="shop-subtotal-note">(${relevant.length - withPrice.length} בלי מחיר)</span>` : ""}`;
+    ${withPrice.length < list.length ? `<span class="shop-subtotal-note">(${list.length - withPrice.length} בלי מחיר)</span>` : ""}`;
 }
 
 // קטגוריות פתוחות (accordion) — לא נשמר בין ביקורים, מתאפס בכל כניסה מחדש
@@ -387,6 +404,7 @@ function renderShopSubtotal(list) {
 let openShopCategories = new Set();
 export function resetShopCategoryState() {
   openShopCategories = new Set();
+  activeShopView = "list"; // חזרה ל"רשימה" בכל כניסה מחדש למסך, כמו הקטגוריות
   renderShopping(); // המסך כבר עמד ברקע (hidden) — חייבים לרנדר מחדש כדי שהאיפוס ייראה בפועל
 }
 
@@ -402,12 +420,55 @@ function shopRowHtml(s) {
           <td>${lt != null ? fmtMoney(lt) : "—"}</td>
           <td>${esc(s.notes || "—")}</td>
           <td><span class="shop-pill shop-${esc(s.status)}">${esc(s.status)}</span></td>
-          <td class="chevron">›</td>
+          <td><button type="button" class="btn-bought" data-buy-shop="${esc(s.id)}">✓ קניתי</button></td>
         </tr>`;
+}
+
+// ---- "מלאי כללי" (Family_OS_Shopping_Inventory_Brief.md) — קטלוג לתוספת מהירה,
+// נפרד לכל סוג חנות, ממוין א'-ב' (SORTERS.inventory ב-state.js). ----
+function invRowHtml(inv) {
+  return `
+        <div class="subtask-item">
+          <div style="flex:1">
+            <div class="stx-name">${esc(inv.name)}</div>
+            ${inv.category ? `<div class="stx-note">${esc(inv.category)}</div>` : ""}
+          </div>
+          <button type="button" class="btn-primary" data-inv-add="${esc(inv.id)}">+ הוסף לרשימה</button>
+          <button class="icon-edit-btn" data-inv-del="${esc(inv.id)}" aria-label="מחיקה מהקטלוג">🗑</button>
+        </div>`;
+}
+
+function renderShopInventory() {
+  const body = document.getElementById("shopInventoryBody");
+  if (!body) return;
+  const list = state.inventory.filter((i) => i.storeType === activeStoreType);
+  body.innerHTML = list.length
+    ? `<div class="subtask-list">${list.map(invRowHtml).join("")}</div>`
+    : `<div class="log-empty">אין עדיין פריטים במלאי הכללי של "${esc(activeStoreType)}" — פריטים ש"קניתם" יגיעו לכאן אוטומטית</div>`;
+
+  body.querySelectorAll("[data-inv-add]").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      const inv = state.inventory.find((i) => i.id === btn.dataset.invAdd);
+      if (!inv) return;
+      await upsert("shopping", { name: inv.name, storeType: inv.storeType, category: inv.category || null, qty: "1", status: "חסר", addedBy: deviceLabel() });
+      showToast(`נוסף לרשימה: ${inv.name}`);
+    })
+  );
+  body.querySelectorAll("[data-inv-del]").forEach((btn) =>
+    btn.addEventListener("click", () => remove("inventoryItem", btn.dataset.invDel))
+  );
 }
 
 export function renderShopping() {
   renderStoreTabs();
+  renderShopViewTabs();
+  const listSection = document.getElementById("shopListSection");
+  const invSection = document.getElementById("shopInventorySection");
+  if (listSection) listSection.hidden = activeShopView !== "list";
+  if (invSection) invSection.hidden = activeShopView !== "inventory";
+
+  if (activeShopView === "inventory") { renderShopInventory(); return; }
+
   const list = state.shopping.filter((s) => itemStoreType(s) === activeStoreType);
   renderShopSubtotal(list);
   const rows = list.length
@@ -445,14 +506,21 @@ export function renderShopping() {
   });
   document.querySelectorAll("#shopTable tr.row-click").forEach((row) => {
     const open = () => openItemForm("shopping", row.dataset.shopId);
-    row.addEventListener("click", (e) => { if (e.target.closest("input,select,textarea")) return; open(); });
-    row.addEventListener("keydown", (e) => { if (e.target.closest("input,select,textarea")) return; if (e.key === "Enter") open(); });
+    row.addEventListener("click", (e) => { if (e.target.closest("input,select,textarea,button")) return; open(); });
+    row.addEventListener("keydown", (e) => { if (e.target.closest("input,select,textarea,button")) return; if (e.key === "Enter") open(); });
   });
   document.querySelectorAll("#shopTable input[data-cat-shop]").forEach((inp) => {
     inp.addEventListener("change", async () => {
       const s = state.shopping.find((x) => x.id === inp.dataset.catShop);
       if (!s) return;
       await upsert("shopping", { ...s, category: inp.value.trim() || null });
+    });
+  });
+  document.querySelectorAll("#shopTable [data-buy-shop]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const s = state.shopping.find((x) => x.id === btn.dataset.buyShop);
+      if (s) markShoppingItemBought(s);
     });
   });
 }
