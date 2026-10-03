@@ -270,6 +270,17 @@ tr.row-click:hover { background: #FAF9F6; }
 .shop-detail-inline { max-height: 0; overflow: hidden; transition: max-height .2s ease; }
 .shop-detail-inline.open { max-height: 80px; margin-top: -2px; margin-bottom: 4px; }
 
+/* קיצורי-דרך במסך הבית (Family_OS_Home_Shortcuts_Brief.md) */
+.home-shortcuts { display: flex; gap: 8px; margin-bottom: 10px; }
+.home-shortcuts .btn-primary { flex: 1; padding: 12px 16px; font-size: 14px; }
+.quick-add-form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.quick-add-form[hidden] { display: none; }
+.quick-add-name { flex: 1 1 180px; padding: 10px 12px; border: 1px solid #E5E2DB; border-radius: 8px; font-size: 14px; font-family: inherit; background: #fff; color: var(--text-primary); }
+.quick-add-qty { width: 72px; padding: 10px 12px; border: 1px solid #E5E2DB; border-radius: 8px; font-size: 14px; font-family: inherit; background: #fff; color: var(--text-primary); }
+.quick-add-qty[hidden] { display: none; }
+@media (max-width: 520px) { .quick-add-name { flex: 1 1 100%; } }
+.quick-add-name:focus, .quick-add-qty:focus { outline: 2px solid var(--accent-fin); outline-offset: 1px; }
+
 /* תיבת חיפוש בקטלוג "מלאי" (Family_OS_Lists_UX_Brief.md, סעיף 3) */
 .shop-inv-search-wrap { margin-bottom: 10px; }
 .shop-inv-search { width: 100%; padding: 9px 12px; border: 1px solid #E5E2DB; border-radius: 8px; font-size: 13px; font-family: inherit; background: #fff; color: var(--text-primary); }

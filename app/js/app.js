@@ -6,7 +6,7 @@ import {
   renderAll, renderTasks, setCategoryFilter, getCategoryFilter, setTaskSearchQuery, setRoutineToggleHandler,
   getActiveStoreType, resetShopCategoryState,
 } from "./render.js";
-import { openItemForm, bulkAddShoppingItems, migrateLegacyInStockShoppingItems } from "./forms.js";
+import { openItemForm, bulkAddShoppingItems, migrateLegacyInStockShoppingItems, quickAddTask, quickAddShoppingItem } from "./forms.js";
 import { initNotifications, setToastHandler, checkAll as checkNotifications } from "./notifications.js";
 import { toast } from "./toast.js";
 import { deviceLabel } from "./cloud.js";
@@ -199,6 +199,34 @@ function wireShoppingBulkAdd() {
   });
 }
 
+// ---- קיצורי-דרך במסך הבית (Family_OS_Home_Shortcuts_Brief.md): תיבת הזנה במקום, בלי ניווט ----
+function wireHomeShortcuts() {
+  const form = document.getElementById("quickAddForm");
+  const nameInp = document.getElementById("quickAddName");
+  const qtyInp = document.getElementById("quickAddQty");
+  let mode = null; // "task" | "shop"
+  const close = () => { form.hidden = true; mode = null; nameInp.value = ""; qtyInp.value = "1"; };
+  const open = (m) => {
+    mode = m;
+    nameInp.placeholder = m === "task" ? "שם המשימה" : "שם הפריט (לרשימת סופר)";
+    qtyInp.hidden = m !== "shop";
+    form.hidden = false;
+    nameInp.focus();
+  };
+  document.getElementById("quickTaskBtn").addEventListener("click", () => open("task"));
+  document.getElementById("quickShopBtn").addEventListener("click", () => open("shop"));
+  document.getElementById("quickAddCancel").addEventListener("click", close);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = nameInp.value.trim();
+    if (!name || !mode) return;
+    if (mode === "task") await quickAddTask(name);
+    else await quickAddShoppingItem(name, qtyInp.value.trim());
+    toast(mode === "task" ? `נוספה משימה: ${name}` : `נוסף לרשימת סופר: ${name}`);
+    close();
+  });
+}
+
 // ---- Overlay: סגירה בלחיצה על הרקע / Escape ----
 function wireOverlay() {
   const overlay = document.getElementById("modalOverlay");
@@ -248,6 +276,7 @@ async function main() {
   wireSidebar();
   wireButtons();
   wireShoppingBulkAdd();
+  wireHomeShortcuts();
   wireTaskSearch();
   wireOverlay();
   wireAuth();

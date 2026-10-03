@@ -52,6 +52,16 @@
     <main class="app-main">
       <!-- ===== בית (מסך ראשי) — תמונת-יום מאוחדת ===== -->
       <div class="screen" id="screen-hub">
+        <div class="home-shortcuts">
+          <button type="button" class="btn-primary" id="quickTaskBtn">+ משימה</button>
+          <button type="button" class="btn-primary" id="quickShopBtn">+ קניות</button>
+        </div>
+        <form class="quick-add-form" id="quickAddForm" hidden>
+          <input type="text" id="quickAddName" class="quick-add-name" autocomplete="off">
+          <input type="text" id="quickAddQty" class="quick-add-qty" placeholder="כמות" value="1" autocomplete="off" hidden>
+          <button type="submit" class="btn-primary">הוספה</button>
+          <button type="button" class="btn-secondary" id="quickAddCancel">ביטול</button>
+        </form>
         <div class="glance-title">היום</div>
         <div class="urgent-groups" id="homeAgenda"></div>
       </div>

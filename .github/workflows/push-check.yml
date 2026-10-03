@@ -27,3 +27,4 @@ jobs:
       - run: node scripts/send-push.mjs
         env:
           FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+          TZ: Asia/Jerusalem

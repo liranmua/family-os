@@ -9,6 +9,19 @@
 
 import admin from "firebase-admin";
 
+// כל השעות ב-Firestore (בלוקים/משימות) הן שעון ישראל; runner של GitHub Actions רץ ב-UTC.
+// חייב להיקבע לפני כל שימוש ב-Date (גם ה-workflow מגדיר TZ — כאן כגיבוי).
+process.env.TZ = "Asia/Jerusalem";
+
+// אותו מיפוי מייל->שם כמו app/js/constants.js (EMAIL_TO_NAME) — לצורך התאמה אישית של ההתראה היומית.
+const EMAIL_TO_NAME = { "liranmua@gmail.com": "לירן" };
+const PEOPLE = ["לירן", "מורן"];
+
+// התראה יומית בבוקר (סבב 3): טריגר רביעי. חלון 07:30–09:00 (יעד 07:30–08:00; הרחבה כנגד עיכובי GitHub Actions),
+// נשלח פעם אחת ביום (firedKeys).
+const DAILY_START_MIN = 7 * 60 + 30;
+const DAILY_END_MIN = 9 * 60;
+
 // אותו נתיב משפחתי קבוע כמו app/js/firebase.js — מזהה ניתוב, לא סוד.
 const FAMILY_ID = "fam_fd8a2e611ce12ff0e8bce649";
 const BLOCK_LEAD_MIN = 15;
@@ -55,6 +68,34 @@ async function sendToAll(tokenDocs, title, body) {
   } catch (e) {
     console.error(`שליחת "${title}" נכשלה:`, e.message || e);
   }
+}
+
+function summarize(items, max = 4) {
+  const shown = items.slice(0, max).map((i) => i.text).join(" · ");
+  return items.length > max ? `${shown} · +${items.length - max} נוספים` : shown;
+}
+
+// התאמה אישית לפי מכשיר: טוקן שהמייל שלו מזוהה בשם -> "שלך" / "אצל <השני>" (כמו "שלך היום"/"גם היום אצל מורן");
+// טוקן לא מזוהה (למשל מורן, עדיין לא מחוברת בשם) -> רשימה אחת רגילה.
+async function sendDaily(tokenDocs, items) {
+  const named = new Map(); // name -> tokenDocs
+  const generic = [];
+  for (const t of tokenDocs) {
+    const name = EMAIL_TO_NAME[t.email];
+    if (name) { if (!named.has(name)) named.set(name, []); named.get(name).push(t); }
+    else generic.push(t);
+  }
+  for (const [me, docs] of named) {
+    const other = PEOPLE.find((p) => p !== me);
+    const mine = items.filter((i) => i.owner === me);
+    const theirs = items.filter((i) => i.owner === other);
+    const parts = [];
+    if (mine.length) parts.push(`שלך: ${summarize(mine)}`);
+    if (theirs.length) parts.push(`אצל ${other}: ${summarize(theirs, 2)}`);
+    if (!parts.length) continue;
+    await sendToAll(docs, "☀️ הבוקר שלך", parts.join("\n"));
+  }
+  if (generic.length) await sendToAll(generic, "☀️ היום", summarize(items, 5));
 }
 
 async function main() {
@@ -129,12 +170,30 @@ async function main() {
     }
   });
 
-  const totalNew = notifications.length + shoppingNotifications.length;
+  // 4) התראה יומית בבוקר — אותה לוגיקת מיזוג כמו מסך הבית (renderHub): בלוקים של היום + משימות
+  // פתוחות עם יעד עד היום או עדיפות דחוף. אירועי Google Calendar לא כלולים (הטוקן שלהם נמצא רק בדפדפן
+  // של המשתמש, לא נגיש מהסקריפט). שגרות לא כלולות — גם מסך הבית לא מציג אותן (אין להן תאריך).
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const dailyKey = `daily@${today}`;
+  let dailyItems = null;
+  if (nowMin >= DAILY_START_MIN && nowMin < DAILY_END_MIN && !firedKeys.has(dailyKey)) {
+    firedKeys.add(dailyKey);
+    const blocksToday = weeklyBlocks
+      .filter((b) => b.dayOfWeek === now.getDay())
+      .map((b) => ({ sort: b.startTime || "00:00", owner: b.leader, text: `${b.startTime ? b.startTime + " " : ""}${b.title}` }));
+    const tasksToday = tasks
+      .filter((t) => t.status !== "done" && ((t.dueDate && t.dueDate <= today) || t.priority === "דחוף"))
+      .map((t) => ({ sort: t.dueTime || "00:00", owner: t.owner, text: `${t.dueTime ? t.dueTime + " " : ""}${t.name}` }));
+    dailyItems = [...blocksToday, ...tasksToday].sort((a, b) => a.sort.localeCompare(b.sort));
+  }
+
+  const totalNew = notifications.length + shoppingNotifications.length + (dailyItems && dailyItems.length ? 1 : 0);
   if (!totalNew) {
     console.log("אין התראות חדשות לשליחה.");
   } else if (!tokenDocs.length) {
     console.log(`${totalNew} התראות ממתינות, אבל אין עדיין אף מכשיר רשום ל-Push (ר' הגדרות → התראות Push).`);
   } else {
+    if (dailyItems && dailyItems.length) await sendDaily(tokenDocs, dailyItems);
     for (const n of notifications) await sendToAll(tokenDocs, n.title, n.body);
     // מדלגים על הטוקן של אותו מכשיר שהוסיף את הפריט — כמו s.addedBy !== me אצל הלקוח.
     for (const n of shoppingNotifications) {

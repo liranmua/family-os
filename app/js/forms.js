@@ -3,9 +3,10 @@
 
 import { state, upsert, remove, saveFinance } from "./state.js";
 import { deviceLabel } from "./cloud.js";
+import { currentUser } from "./auth.js";
 import { toast as showToast, showUndoToast } from "./toast.js";
 import {
-  CATEGORY_LIST, ASSIGNABLE_NAMES, ALL_PEOPLE_NAMES, STATUS_LABEL, STATUS_CLASS, STATUS_ORDER,
+  CATEGORY_LIST, ASSIGNABLE_NAMES, ALL_PEOPLE_NAMES, EMAIL_TO_NAME, STATUS_LABEL, STATUS_CLASS, STATUS_ORDER,
   TYPE_META, PRIORITY_OPTIONS, FREQUENCY_OPTIONS, SHOP_STATUS_OPTIONS, SHOP_STORE_TYPES,
   DAY_NAMES, optionList, formatDateDisplay, nextId, todayStr, esc, escAttr, splitBulkText,
 } from "./constants.js";
@@ -58,6 +59,27 @@ export async function bulkAddShoppingItems(names, storeType, linkedProjectId = n
       addedBy: deviceLabel(),
     });
   }
+}
+
+// ---- כפתורי קיצור-דרך במסך הבית (Family_OS_Home_Shortcuts_Brief.md) ----
+// אותן ברירות מחדל בדיוק כמו הוספה בודדת רגילה (taskFormBody / shoppingFormBody).
+export async function quickAddShoppingItem(name, qty) {
+  await upsert("shopping", {
+    name, storeType: "סופר", category: null, qty: qty || "1", price: null, notes: null, status: "חסר",
+    linkedProjectId: null, addedBy: deviceLabel(),
+  });
+}
+
+// "מוביל" חובה — ברירת מחדל: המשתמש המחובר (אם מזוהה), אחרת הראשון ברשימה, כמו בטופס הרגיל.
+export async function quickAddTask(name) {
+  const u = currentUser();
+  const me = u && u.email ? EMAIL_TO_NAME[u.email] : null;
+  await upsert("task", {
+    id: nextId("TSK", state.tasks.map((t) => t.id)),
+    name, category: CATEGORY_LIST[0], owner: me || ASSIGNABLE_NAMES[0], alsoRelevantTo: [],
+    status: "todo", taskType: "חד-פעמית", dueDate: null, dueTime: null, frequency: "חד-פעמי",
+    priority: "רגיל", next: "—", relatedPerson: null, projectId: null, subtasks: [],
+  });
 }
 
 // יוצר פריט רשימת-אריזה נפרד לכל שם, לא-מסומן-כארוז (כמו הוספה בודדת).
