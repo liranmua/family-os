@@ -20,7 +20,7 @@ const PEOPLE = ["לירן", "מורן"];
 // התראה יומית בבוקר (סבב 3): טריגר רביעי, פעם אחת ביום (firedKeys).
 // GitHub Actions מפעיל את ה-cron המתוזמן רק ~4-6 פעמים ביממה (לא כל 5 דקות — נמדד אמפירית, אוקטובר 2026),
 // כך שחלון צר של 07:30–09:00 כמעט אף פעם לא נפגע. לכן: ההרצה הראשונה אחרי 07:30 שולחת ("catch-up"),
-// ועד DAILY_END_MIN. היום מסומן כנשלח רק אחרי משלוח מוצלח בפועל (לפחות מכשיר אחד).
+// ועד DAILY_END_MIN (כולל). היום מסומן כנשלח רק אחרי משלוח מוצלח בפועל (לפחות מכשיר אחד).
 const DAILY_START_MIN = 7 * 60 + 30;
 const DAILY_END_MIN = 13 * 60;
 
@@ -187,7 +187,7 @@ async function main() {
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const dailyKey = `daily@${today}`;
   let dailyItems = [];
-  let dailyDue = nowMin >= DAILY_START_MIN && nowMin < DAILY_END_MIN && !firedKeys.has(dailyKey);
+  let dailyDue = nowMin >= DAILY_START_MIN && nowMin <= DAILY_END_MIN && !firedKeys.has(dailyKey);
   if (dailyDue) {
     const blocksToday = weeklyBlocks
       .filter((b) => b.dayOfWeek === now.getDay())
