@@ -8,7 +8,8 @@ name: Family OS push notifications
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    # דקות "לא עגולות" (GitHub מצמצם הרצות בשעות עומס, בעיקר בתחילת שעה). בפועל מופעל רק כמה פעמים ביממה — ראו send-push.mjs.
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
 
 concurrency:
