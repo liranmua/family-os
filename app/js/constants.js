@@ -35,6 +35,39 @@ export const STATUS_LABEL = { todo: "טרם התחיל", progress: "בביצוע
 export const STATUS_CLASS = { todo: "status-todo", progress: "status-progress", waiting: "status-waiting", done: "status-done" };
 export const STATUS_ORDER = ["todo", "progress", "waiting", "done"];
 
+// "תוקף עד" (validUntil) + "ממתין" (waiting + nextCheckDate) — מקור יחיד להגדרת פתוחה/דחופה/שקטה,
+// כדי שמסך הבית, דשבורד המשימות, ההתראות והתקציר היומי לא יסטו זה מזה. (scripts/send-push.mjs
+// משכפל את אותן פונקציות — סקריפט Node נפרד שלא מייבא מ-app/.)
+export const VALIDITY_URGENT_DAYS = 14; // מתחילים להציג כ"דחופה" כשנשארו עד 14 יום לתוקף (או שכבר פג)
+
+export function daysUntil(iso, from = todayStr()) {
+  const [y1, m1, d1] = from.split("-").map(Number);
+  const [y2, m2, d2] = iso.split("-").map(Number);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000);
+}
+// ממתין שתאריך הבדיקה שלו עוד לא הגיע = שקטה. ממתין בלי תאריך בדיקה (נתונים ישנים) לא נחבאת — עדיף להציג מאשר לאבד.
+export function isTaskSnoozed(t, today = todayStr()) {
+  return t.status === "waiting" && !!t.nextCheckDate && t.nextCheckDate > today;
+}
+export function isValidityUrgent(t, today = todayStr()) {
+  return !!t.validUntil && daysUntil(t.validUntil, today) <= VALIDITY_URGENT_DAYS;
+}
+// הגיע (או עבר) תאריך הבדיקה של משימה ממתינה — היא חוזרת להופיע כדי להזכיר בפועל לבדוק מול הגורם החיצוני.
+export function isCheckDue(t, today = todayStr()) {
+  return t.status === "waiting" && !!t.nextCheckDate && t.nextCheckDate <= today;
+}
+export function isTaskUrgent(t, today = todayStr()) {
+  if (t.status === "done" || isTaskSnoozed(t, today)) return false;
+  return (!!t.dueDate && t.dueDate <= today) || t.priority === "דחוף" || isValidityUrgent(t, today) || isCheckDue(t, today);
+}
+export function validityLabel(t, today = todayStr()) {
+  if (!t.validUntil) return "";
+  const n = daysUntil(t.validUntil, today);
+  if (n < 0) return "התוקף פג";
+  if (n === 0) return "תוקף עד היום";
+  return `תוקף עוד ${n} ימים`;
+}
+
 export const TYPE_META = {
   "חד-פעמית": { icon: "📌", cls: "type-once" },
   "תהליכית": { icon: "🧩", cls: "type-process" },

@@ -5,7 +5,7 @@
 
 import { state, getMeta, setMeta } from "./state.js";
 import { deviceLabel } from "./cloud.js";
-import { formatDateDisplay, todayStr } from "./constants.js";
+import { formatDateDisplay, todayStr, isTaskSnoozed } from "./constants.js";
 
 const CHECK_INTERVAL_MS = 60 * 1000;
 const BLOCK_LEAD_MIN = 15;
@@ -67,7 +67,7 @@ function checkTasks() {
   const now = new Date();
   const today = todayStr(now);
   state.tasks.forEach((t) => {
-    if (t.status === "done" || !t.dueDate) return;
+    if (t.status === "done" || isTaskSnoozed(t, today) || !t.dueDate) return; // "ממתין" שקט עד תאריך הבדיקה
     if (t.dueTime) {
       const [y, m, d] = t.dueDate.split("-").map(Number);
       const [hh, mm] = t.dueTime.split(":").map(Number);

@@ -4,7 +4,7 @@
 import { state, upsert, remove } from "./state.js";
 import {
   CATEGORY_COLOR, PEOPLE, ASSIGNABLE_NAMES, EMAIL_TO_NAME, STATUS_LABEL, STATUS_CLASS, TYPE_META, SHOP_STORE_TYPES, DAY_NAMES,
-  formatDateDisplay, todayStr, esc,
+  formatDateDisplay, todayStr, esc, isTaskSnoozed, isTaskUrgent, isValidityUrgent, isCheckDue, validityLabel, daysUntil,
 } from "./constants.js";
 import { deviceLabel } from "./cloud.js";
 import { toast as showToast } from "./toast.js";
@@ -68,7 +68,8 @@ function otherPersonName(me) {
 
 function homeGroupHtml(title, items) {
   if (!items.length) return "";
-  const sorted = [...items].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  // תוקף שמתקרב עולה בדירוג: באותה שעה, משימה עם פחות ימים לתוקף קודמת (rank קטן = דחוף יותר).
+  const sorted = [...items].sort((a, b) => a.sortKey.localeCompare(b.sortKey) || (a.rank ?? 9999) - (b.rank ?? 9999));
   return `
     <div class="urgent-group">
       <div class="ug-head">${esc(title)}</div>
@@ -109,14 +110,26 @@ export function renderHub() {
     }));
 
   // מקור 3: משימות דחופות — אותה לוגיקה בדיוק כמו renderTasksDashboard (לא הגדרה חדשה).
-  const openTasks = state.tasks.filter((t) => t.status !== "done");
-  const tasks = openTasks
-    .filter((t) => (t.dueDate && t.dueDate <= today) || t.priority === "דחוף")
-    .map((t) => ({
-      sortKey: t.dueTime || "00:00",
-      time: t.dueTime || (t.dueDate && t.dueDate < today ? "באיחור" : "ללא שעה"),
-      title: t.name, go: "tasks", owner: t.owner, tag: "✅ משימה",
-    }));
+  // isTaskUrgent = פתוחה, לא "ממתין" שקט, ויש יעד שהגיע / דחוף / תוקף בטווח 14 יום (constants.js).
+  const tasks = state.tasks
+    .filter((t) => isTaskUrgent(t, today))
+    .map((t) => {
+      const byDue = (t.dueDate && t.dueDate <= today) || t.priority === "דחוף";
+      const vUrgent = isValidityUrgent(t, today);
+      const checkDue = isCheckDue(t, today);
+      // כשהדחיפות נובעת רק מהתוקף / מתאריך בדיקה שהגיע — מציגים את הסיבה; אחרת כמו קודם.
+      const time = t.dueTime || (t.dueDate && t.dueDate < today ? "באיחור"
+        : checkDue && !byDue ? "זמן לבדוק מול הגורם"
+        : !byDue && vUrgent ? validityLabel(t, today) : "ללא שעה");
+      const ranks = [vUrgent ? daysUntil(t.validUntil, today) : null, checkDue ? daysUntil(t.nextCheckDate, today) : null].filter((n) => n !== null);
+      return {
+        sortKey: t.dueTime || "00:00",
+        time,
+        title: t.name, go: "tasks", owner: t.owner,
+        tag: checkDue && !byDue ? "🔔 בדיקה" : vUrgent && !byDue ? "⏳ תוקף" : "✅ משימה",
+        rank: ranks.length ? Math.min(...ranks) : undefined,
+      };
+    });
 
   const all = [...events, ...blocks, ...tasks];
   let html;
@@ -188,8 +201,11 @@ function renderTasksDashboard() {
   const dash = document.getElementById("tasksDashboard");
   if (!dash) return;
   const today = todayStr();
-  const open = state.tasks.filter((t) => t.status !== "done");
-  const urgent = open.filter((t) => (t.dueDate && t.dueDate <= today) || t.priority === "דחוף");
+  // "פתוחות" לא כוללת משימות ממתינות שתאריך הבדיקה שלהן עוד לא הגיע (שקטות); הן מוצגות כמונה נפרד.
+  const notDone = state.tasks.filter((t) => t.status !== "done");
+  const snoozed = notDone.filter((t) => isTaskSnoozed(t, today));
+  const open = notDone.filter((t) => !isTaskSnoozed(t, today));
+  const urgent = open.filter((t) => isTaskUrgent(t, today));
   const byCategory = {};
   urgent.forEach((t) => { (byCategory[t.category] ||= []).push(t); });
   const cats = Object.keys(byCategory);
@@ -199,6 +215,7 @@ function renderTasksDashboard() {
       <span class="tc-num">${open.length}</span>
       <span class="tc-lbl">משימות פתוחות</span>
       ${urgent.length ? `<span class="pill pill-bad">${urgent.length} דחופות</span>` : ""}
+      ${snoozed.length ? `<span class="pill">⏳ ${snoozed.length} ממתינות</span>` : ""}
     </div>
     ${
       cats.length
@@ -212,7 +229,7 @@ function renderTasksDashboard() {
               (t) => `
             <button class="urgent-item" data-open-task="${esc(t.id)}">
               <span class="ui-name">${esc(t.name)}</span>
-              <span class="ui-meta">${esc(t.owner)}${t.dueDate ? " · " + formatDateDisplay(t.dueDate) : ""}</span>
+              <span class="ui-meta">${esc(t.owner)}${t.dueDate ? " · " + formatDateDisplay(t.dueDate) : ""}${isValidityUrgent(t, today) ? " · " + esc(validityLabel(t, today)) : ""}${isCheckDue(t, today) ? " · זמן לבדוק מול הגורם" : ""}</span>
             </button>`
             )
             .join("")}
@@ -247,7 +264,7 @@ export function renderTasks() {
           <td>${esc(t.category)}</td>
           <td>${esc(t.owner)}</td>
           <td style="color:var(--text-secondary)">${dateCell}</td>
-          <td><span class="badge status-pill ${STATUS_CLASS[t.status]}">${STATUS_LABEL[t.status]}</span></td>
+          <td><span class="badge status-pill ${STATUS_CLASS[t.status]}">${STATUS_LABEL[t.status]}</span>${t.status === "waiting" && t.nextCheckDate ? `<span class="progress-text" style="margin-inline-start:6px">בדיקה: ${formatDateDisplay(t.nextCheckDate)}</span>` : ""}</td>
           <td>${progressCell}</td>
           <td>${relatedCell}</td>
           <td class="chevron">›</td>

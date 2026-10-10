@@ -8,7 +8,7 @@ import { toast as showToast, showUndoToast } from "./toast.js";
 import {
   CATEGORY_LIST, ASSIGNABLE_NAMES, ALL_PEOPLE_NAMES, EMAIL_TO_NAME, STATUS_LABEL, STATUS_CLASS, STATUS_ORDER,
   TYPE_META, PRIORITY_OPTIONS, FREQUENCY_OPTIONS, SHOP_STATUS_OPTIONS, SHOP_STORE_TYPES,
-  DAY_NAMES, optionList, formatDateDisplay, nextId, todayStr, esc, escAttr, splitBulkText,
+  DAY_NAMES, optionList, formatDateDisplay, nextId, todayStr, esc, escAttr, splitBulkText, validityLabel,
 } from "./constants.js";
 import { renderAll, projectProgress, subtaskProgress, getActiveStoreType, groupByCategory } from "./render.js";
 import { showScreen } from "./nav.js";
@@ -151,6 +151,8 @@ export function openTaskDetail(taskId) {
     ["סוג משימה", `${type.icon} ${t.taskType}`],
     ["סטטוס", STATUS_LABEL[t.status]],
     ["תאריך יעד", dateVal],
+    ...(t.validUntil ? [["תוקף עד", `${formatDateDisplay(t.validUntil)} · ${validityLabel(t)}`]] : []),
+    ...(t.status === "waiting" && t.nextCheckDate ? [["בדיקה הבאה", formatDateDisplay(t.nextCheckDate)]] : []),
     ["תדירות", t.frequency],
     ["עדיפות", t.priority],
     ["נוגע ל", t.relatedPerson || "—"],
@@ -945,6 +947,8 @@ function taskFormBody(t) {
       <div class="form-field"><label for="f-frequency">תדירות</label><select id="f-frequency">${optionList(FREQUENCY_OPTIONS, t.frequency || "חד-פעמי")}</select></div>
       <div class="form-field"><label for="f-dueDate">תאריך יעד</label><input type="date" id="f-dueDate" value="${escAttr(t.dueDate || "")}"></div>
       <div class="form-field"><label for="f-dueTime">שעה</label><input type="time" id="f-dueTime" value="${escAttr(t.dueTime || "")}"></div>
+      <div class="form-field"><label for="f-validUntil">תוקף עד (לא חובה)</label><input type="date" id="f-validUntil" value="${escAttr(t.validUntil || "")}"></div>
+      <div class="form-field" id="nextCheckField" style="display:${t.status === "waiting" ? "block" : "none"}"><label for="f-nextCheck">תאריך בדיקה הבא <span class="req-hint">*</span></label><input type="date" id="f-nextCheck" value="${escAttr(t.nextCheckDate || "")}"></div>
       <div class="form-field"><label for="f-relatedPerson">נוגע ל (לא חובה)</label><select id="f-relatedPerson"><option value="">—</option>${optionList(ALL_PEOPLE_NAMES, t.relatedPerson)}</select></div>
       <div class="form-field"><label for="f-projectId">פרויקט מקושר (לא חובה)</label><select id="f-projectId"><option value="">—</option>${state.projects.map((p) => `<option value="${escAttr(p.id)}" ${p.id === t.projectId ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
     </div>
@@ -1075,6 +1079,10 @@ function wireForm(kind, existing) {
       );
     };
     document.querySelectorAll('input[name="taskType"]').forEach((r) => r.addEventListener("change", sync));
+    // שדה "תאריך בדיקה הבא" מתגלה רק כשהסטטוס "ממתין".
+    document.getElementById("f-status").addEventListener("change", (e) => {
+      document.getElementById("nextCheckField").style.display = e.target.value === "waiting" ? "block" : "none";
+    });
     document.getElementById("addSubtaskRowBtn").addEventListener("click", () => {
       document.getElementById("subtaskBuilder").insertAdjacentHTML("beforeend", subtaskRowHtml(null, "", ""));
       wireSubtaskRemoveButtons();
@@ -1155,6 +1163,14 @@ async function saveFromForm(kind, existing) {
         subtasks.push(sub);
       });
     }
+    const statusVal = val("f-status");
+    const nextCheckDate = statusVal === "waiting" ? val("f-nextCheck") || null : null; // מתנקה כשיוצאים מ"ממתין"
+    if (statusVal === "waiting" && !nextCheckDate) {
+      const err = document.getElementById("formError");
+      err.textContent = 'במשימה ב"ממתין" צריך למלא תאריך בדיקה הבא (אחרת היא לא תחזור להזכיר).';
+      err.hidden = false;
+      return false;
+    }
     const owner = val("f-owner"); // select מוגבל ל-לירן/מורן — שדה "מוביל" יחיד וחובה, נאכף מבנית
     const alsoRelevantTo = [...document.querySelectorAll(".also-relevant-cb:checked")].map((cb) => cb.value);
     const obj = {
@@ -1168,6 +1184,8 @@ async function saveFromForm(kind, existing) {
       taskType,
       dueDate: val("f-dueDate") || null,
       dueTime: val("f-dueTime") || null,
+      validUntil: val("f-validUntil") || null,
+      nextCheckDate,
       frequency: val("f-frequency"),
       priority: val("f-priority"),
       next: trimVal("f-next") || "—",

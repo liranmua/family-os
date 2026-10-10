@@ -45,6 +45,21 @@ admin.initializeApp({ credential: admin.credential.cert(JSON.parse(keyJson)) });
 const db = admin.firestore();
 const famRef = db.collection("families").doc(FAMILY_ID);
 
+// משכפל את הלוגיקה מ-app/js/constants.js (סקריפט נפרד, לא מייבא מ-app/): "ממתין" שקט עד תאריך הבדיקה,
+// ומשימה עם "תוקף עד" שמתקרב (≤14 יום או שפג) נחשבת דחופה בתקציר היומי.
+const VALIDITY_URGENT_DAYS = 14;
+function daysUntil(iso, fromIso) {
+  const [y1, m1, d1] = fromIso.split("-").map(Number);
+  const [y2, m2, d2] = iso.split("-").map(Number);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000);
+}
+const isSnoozed = (t, today) => t.status === "waiting" && !!t.nextCheckDate && t.nextCheckDate > today;
+const isValidityUrgent = (t, today) => !!t.validUntil && daysUntil(t.validUntil, today) <= VALIDITY_URGENT_DAYS;
+const isCheckDue = (t, today) => t.status === "waiting" && !!t.nextCheckDate && t.nextCheckDate <= today;
+const isUrgent = (t, today) =>
+  t.status !== "done" && !isSnoozed(t, today) &&
+  ((!!t.dueDate && t.dueDate <= today) || t.priority === "דחוף" || isValidityUrgent(t, today) || isCheckDue(t, today));
+
 function todayStr(d) {
   const p = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
@@ -146,7 +161,7 @@ async function main() {
 
   // 2) משימה עם יעד מתקרב (שעה לפני / בוקר יום היעד, כמו notifications.js:checkTasks)
   tasks.forEach((t) => {
-    if (t.status === "done" || !t.dueDate) return;
+    if (t.status === "done" || isSnoozed(t, today) || !t.dueDate) return;
     if (t.dueTime) {
       const [y, m, d] = t.dueDate.split("-").map(Number);
       const [hh, mm] = t.dueTime.split(":").map(Number);
@@ -193,9 +208,17 @@ async function main() {
       .filter((b) => b.dayOfWeek === now.getDay())
       .map((b) => ({ sort: b.startTime || "00:00", owner: b.leader, text: `${b.startTime ? b.startTime + " " : ""}${b.title}` }));
     const tasksToday = tasks
-      .filter((t) => t.status !== "done" && ((t.dueDate && t.dueDate <= today) || t.priority === "דחוף"))
-      .map((t) => ({ sort: t.dueTime || "00:00", owner: t.owner, text: `${t.dueTime ? t.dueTime + " " : ""}${t.name}` }));
-    dailyItems = [...blocksToday, ...tasksToday].sort((a, b) => a.sort.localeCompare(b.sort));
+      .filter((t) => isUrgent(t, today))
+      .map((t) => {
+        const days = isValidityUrgent(t, today) ? daysUntil(t.validUntil, today) : null;
+        const vNote = days === null ? "" : days < 0 ? " (התוקף פג)" : days === 0 ? " (תוקף עד היום)" : ` (תוקף עוד ${days} ימים)`;
+        const checkDue = isCheckDue(t, today);
+        const note = vNote + (checkDue ? " (זמן לבדוק מול הגורם)" : "");
+        // תוקף שמתקרב / תאריך בדיקה שהגיע עולים בדירוג: באותה שעה, פחות ימים קודם.
+        const ranks = [days, checkDue ? daysUntil(t.nextCheckDate, today) : null].filter((n) => n !== null);
+        return { sort: t.dueTime || "00:00", rank: ranks.length ? Math.min(...ranks) : 9999, owner: t.owner, text: `${t.dueTime ? t.dueTime + " " : ""}${t.name}${note}` };
+      });
+    dailyItems = [...blocksToday, ...tasksToday].sort((a, b) => a.sort.localeCompare(b.sort) || (a.rank ?? 9999) - (b.rank ?? 9999));
     if (!dailyItems.length) { firedKeys.add(dailyKey); dailyDue = false; } // אין מה להציג היום — לא שולחים ולא מנסים שוב
   }
 
