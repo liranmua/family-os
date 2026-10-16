@@ -18,7 +18,9 @@ import {
   isConnected as calIsConnected, getEvents as calGetEvents, getLastFetchedAt as calGetLastFetchedAt,
   getLastError as calGetLastError, connectCalendar, fetchEvents as calFetchEvents, disconnectCalendar,
 } from "./calendar.js";
+import { getMarketSheetId as driveGetMarketSheetId, getMarketSheetName as driveGetMarketSheetName, pickSheet as drivePickSheet } from "./drive.js";
 import { getFolderId as driveGetFolderId, getFolderName as driveGetFolderName, getLastError as driveGetLastError, pickFolder as drivePickFolder } from "./drive.js";
+import { canSeeMarket, renderMarket, refreshMarket, clearMarketData, setMarketRerender } from "./market.js";
 import { isPushSupported, isPushGranted, getPushError as pushGetError, enablePush } from "./push.js";
 
 let activeCategoryFilter = "";
@@ -806,13 +808,49 @@ export function renderCalendarScreen() {
 
 // ---- Finance (תצוגה מופשטת — לא טבלת נתונים גולמית) ----
 
+// אזור הפיננסים: "מבט מהיר" (תמיד) + "📈 שוק ההון" (לירן בלבד — market.js). לכל משתמש אחר: בדיוק כמו קודם, בלי טאבים.
+let financeSubView = "quick"; // "quick" | "market"
+setMarketRerender(renderMarket);
+export function resetFinanceView() {
+  financeSubView = "quick";
+  clearMarketData();
+  renderFinance();
+}
+
+function renderFinanceTabs() {
+  const tabs = document.getElementById("financeTabs");
+  const market = document.getElementById("marketBody");
+  const card = document.getElementById("financeCard");
+  if (!tabs || !market) return;
+  const mk = canSeeMarket();
+  if (!mk) { financeSubView = "quick"; clearMarketData(); }
+  tabs.hidden = !mk;
+  tabs.innerHTML = mk
+    ? `<button class="store-tab ${financeSubView === "quick" ? "active" : ""}" data-fin-tab="quick">מבט מהיר</button>
+       <button class="store-tab ${financeSubView === "market" ? "active" : ""}" data-fin-tab="market">📈 שוק ההון</button>`
+    : "";
+  card.hidden = financeSubView !== "quick";
+  market.hidden = financeSubView !== "market";
+  tabs.querySelectorAll("[data-fin-tab]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const to = b.dataset.finTab;
+      if (to === financeSubView) return;
+      financeSubView = to;
+      if (to === "market") refreshMarket(); // רענון בכל כניסה לטאב (קריאה מתחילה מלחיצה — חלון ההרשאה של Google לא נחסם)
+      else clearMarketData();
+      renderFinance();
+    })
+  );
+  if (mk && financeSubView === "market") renderMarket();
+}
+
 export function renderFinance() {
   const el = document.getElementById("financeCard");
   if (!el) return;
+  renderFinanceTabs();
   const f = state.finance || {};
   const decisions = Array.isArray(f.openDecisions) ? f.openDecisions.filter(Boolean) : [];
   const hasData = f.budgetFree != null || f.savingsGoalPct != null || decisions.length > 0;
-  el.hidden = false;
 
   const budget = f.budgetFree != null ? `₪ ${Number(f.budgetFree).toLocaleString("he-IL")}` : "—";
   const goalPct = f.savingsGoalPct != null ? Math.max(0, Math.min(100, Number(f.savingsGoalPct))) : null;
@@ -881,9 +919,16 @@ export function renderDriveSettings() {
     <div class="toolbar-row" style="justify-content:space-between;align-items:center">
       <span style="font-size:13px">${folderId ? `📁 ${esc(folderName || folderId)}` : "עדיין לא נבחרה תיקייה"}</span>
       <button class="icon-edit-btn" id="drivePickFolderBtn">${folderId ? "שינוי תיקייה" : "בחירת תיקייה"}</button>
-    </div>`;
+    </div>
+    ${canSeeMarket() ? `
+    <div class="toolbar-row" style="justify-content:space-between;align-items:center;margin-top:10px">
+      <span style="font-size:13px">📈 גיליון מעקב מניות: ${driveGetMarketSheetId() ? esc(driveGetMarketSheetName() || "נבחר") : "עדיין לא נבחר"}</span>
+      <button class="icon-edit-btn" id="marketPickSheetBtn">${driveGetMarketSheetId() ? "החלפת גיליון" : "בחירת גיליון"}</button>
+    </div>` : ""}`;
 
   document.getElementById("drivePickFolderBtn").addEventListener("click", () => drivePickFolder());
+  const mkBtn = document.getElementById("marketPickSheetBtn");
+  if (mkBtn) mkBtn.addEventListener("click", () => drivePickSheet());
 }
 
 // ---- התראות Push (סבב 2, Family_OS_Notifications_Brief.md, מסלול ב') ----

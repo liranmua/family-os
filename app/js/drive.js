@@ -33,10 +33,44 @@ let pendingAction = null; // "folder" | "file" | null — מה לפתוח ברג
 let folderId = null;
 let folderName = null;
 
+// גיליון "מעקב מניות" (Family_OS_Market_Brief.md, ללירן בלבד): רק המזהה והשם נשמרים — מקומית במכשיר
+// דרך setMeta (IndexedDB מקומי, לא מסתנכרן ל-Firestore), בדיוק כמו driveFolderId. נתוני התיק עצמם לא נשמרים בשום מקום.
+let marketSheetId = null;
+let marketSheetName = null;
+let tokenCb = null;   // מי מחכה לטוקן (market.js)
+let tokenFail = null; // ומה לעשות אם לא התקבל
+
 export function isConnected() { return hasGranted; }
 export function getLastError() { return lastError; }
 export function getFolderId() { return folderId; }
 export function getFolderName() { return folderName; }
+export function getMarketSheetId() { return marketSheetId; }
+export function getMarketSheetName() { return marketSheetName; }
+export function isDriveReady() { return !!tokenClient; }
+// טוקן תקף אם יש (בלי לבקש חדש) — null אחרת. אותו טוקן drive.file שכבר משמש את ה-Picker.
+export function getValidToken() {
+  return accessToken && Date.now() < tokenExpiresAt - 30000 ? accessToken : null;
+}
+// מבקש טוקן (חייב לבוא מלחיצת משתמש, כדי שחלון ההרשאה של Google לא ייחסם). onFail נקרא אם בוטל/נכשל.
+export function requestToken(onToken, onFail) {
+  const t = getValidToken();
+  if (t) { onToken(t); return true; }
+  if (!tokenClient) return false;
+  lastError = null;
+  tokenCb = onToken;
+  tokenFail = onFail || null;
+  pendingAction = "token";
+  tokenClient.requestAccessToken({ prompt: hasGranted ? "" : "consent" });
+  return true;
+}
+// 401 מה-API: הטוקן פג/בוטל — מוותרים עליו כדי שהבקשה הבאה תבקש חדש.
+export function invalidateToken() { accessToken = null; tokenExpiresAt = 0; }
+function failPendingToken() {
+  const f = tokenFail;
+  tokenCb = null;
+  tokenFail = null;
+  if (f) f();
+}
 
 function loadGis() {
   return new Promise((resolve, reject) => {
@@ -73,6 +107,8 @@ export async function initDrive(changeHandler) {
   hasGranted = await getMeta("driveGranted", false);
   folderId = await getMeta("driveFolderId", null);
   folderName = await getMeta("driveFolderName", null);
+  marketSheetId = await getMeta("marketSheetId", null);
+  marketSheetName = await getMeta("marketSheetName", null);
 
   try {
     await loadGis();
@@ -89,6 +125,7 @@ export async function initDrive(changeHandler) {
     error_callback: (err) => {
       lastError = err && err.type === "popup_closed" ? null : "ההתחברות ל-Drive לא הושלמה.";
       pendingAction = null;
+      failPendingToken();
       onChange();
     },
   });
@@ -99,6 +136,7 @@ function handleTokenResponse(resp) {
   if (resp.error) {
     lastError = "ההתחברות ל-Drive נכשלה (" + resp.error + ").";
     pendingAction = null;
+    failPendingToken();
     onChange();
     return;
   }
@@ -112,6 +150,13 @@ function handleTokenResponse(resp) {
   pendingAction = null;
   if (action === "folder") openFolderPicker();
   else if (action === "file") openFilePicker();
+  else if (action === "sheet") openSheetPicker();
+  else if (action === "token") {
+    const cb = tokenCb;
+    tokenCb = null;
+    tokenFail = null;
+    if (cb) cb(accessToken);
+  }
 }
 
 function ensureToken(action, cb) {
@@ -134,6 +179,12 @@ export function pickFile(onPicked) {
   if (!folderId) { lastError = "קודם צריך לבחור תיקיית Drive משפחתית בהגדרות."; onChange(); return; }
   _onFilePicked = onPicked;
   ensureToken("file", openFilePicker);
+}
+
+// בחירה חד-פעמית של גיליון מעקב המניות (מההגדרות, ללירן בלבד). בלי הגבלה לתיקייה — הגיליון נמצא בתת-תיקייה.
+export function pickSheet() {
+  if (!tokenClient) return;
+  ensureToken("sheet", openSheetPicker);
 }
 
 let _onFolderPicked = null;
@@ -180,6 +231,28 @@ async function openFilePicker() {
       const doc = data.docs && data.docs[0];
       if (!doc) return;
       if (_onFilePicked) _onFilePicked({ id: doc.id, name: doc.name, url: doc.url, iconUrl: doc.iconUrl, mimeType: doc.mimeType });
+    })
+    .build()
+    .setVisible(true);
+}
+
+async function openSheetPicker() {
+  try { await loadPicker(); } catch (e) { lastError = e.message; onChange(); return; }
+  const view = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setIncludeFolders(true);
+  new google.picker.PickerBuilder()
+    .addView(view)
+    .setOAuthToken(accessToken)
+    .setDeveloperKey(PICKER_API_KEY)
+    .setTitle("בחירת גיליון מעקב המניות")
+    .setCallback(async (data) => {
+      if (data.action !== google.picker.Action.PICKED) return;
+      const doc = data.docs && data.docs[0];
+      if (!doc) return;
+      marketSheetId = doc.id;
+      marketSheetName = doc.name;
+      await setMeta("marketSheetId", marketSheetId);
+      await setMeta("marketSheetName", marketSheetName);
+      onChange();
     })
     .build()
     .setVisible(true);

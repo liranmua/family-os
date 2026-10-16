@@ -4,7 +4,7 @@ import { loadState, resetAll, upsert, state, setChangeHandler, setSyncHandler } 
 import { CATEGORY_LIST, todayStr, splitBulkText } from "./constants.js";
 import {
   renderAll, renderTasks, setCategoryFilter, getCategoryFilter, setTaskSearchQuery, setRoutineToggleHandler,
-  getActiveStoreType, resetShopCategoryState,
+  getActiveStoreType, resetShopCategoryState, resetFinanceView,
 } from "./render.js";
 import { openItemForm, bulkAddShoppingItems, migrateLegacyInStockShoppingItems, quickAddTask, quickAddShoppingItem } from "./forms.js";
 import { initNotifications, setToastHandler, checkAll as checkNotifications } from "./notifications.js";
@@ -64,6 +64,7 @@ function renderAuth(user) {
     signInBtn.hidden = false;
     box.hidden = true;
   }
+  renderAll(); // טאב "שוק ההון" ובלוק ההגדרות תלויים במשתמש המחובר
 }
 
 function wireAuth() {
@@ -270,7 +271,10 @@ async function main() {
   setSyncHandler(updateSyncLine);
   setRoutineToggleHandler(toggleRoutineToday);
   setToastHandler((title, body) => toast(body ? `${title} — ${body}` : title, 6000));
-  setScreenEnterHandler((name) => { if (name === "shopping") resetShopCategoryState(); });
+  setScreenEnterHandler((name) => {
+    if (name === "shopping") resetShopCategoryState();
+    resetFinanceView(); // נתוני שוק ההון נמחקים מהזיכרון בכל מעבר מסך (וחוזרים ל"מבט מהיר") — לא נשמרים בין ביקורים
+  });
 
   wireNav();
   wireSidebar();

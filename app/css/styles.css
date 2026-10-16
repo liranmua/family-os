@@ -377,3 +377,48 @@ tr.row-click:hover { background: #FAF9F6; }
   header { padding: 16px 16px; }
   header h1 { font-size: 17px; }
 }
+
+/* ---- שוק ההון (Family_OS_Market_Brief.md) — מובייל קודם: כרטיסים; במסך רחב: טבלה ---- */
+.mk-statusbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.mk-actions { display: flex; gap: 6px; align-items: center; }
+a.icon-edit-btn { text-decoration: none; display: inline-block; }
+.mk-section { margin-bottom: 22px; }
+.mk-section h3 { font-size: 14px; margin: 0 0 10px; color: var(--text-primary); }
+.mk-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 22px; }
+.mk-metric { background: var(--bg-card); border-radius: var(--radius); padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06); border-inline-start: 4px solid var(--accent-fin); }
+.mk-metric .fc-k { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+.mk-v { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mk-sub { font-size: 11.5px; color: var(--text-secondary); margin-top: 3px; }
+.mk-pos { color: var(--positive); }
+.mk-neg { color: var(--danger); }
+.mk-strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+.mk-cards { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.mk-cards-small { grid-template-columns: repeat(2, 1fr); }
+.mk-card { background: var(--bg-card); border-radius: var(--radius); padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.mk-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+.mk-card-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+.mk-name { font-weight: 700; font-size: 14px; }
+.mk-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.mk-note { font-size: 12px; margin-top: 6px; color: var(--text-primary); background: #F5F4F1; border-radius: 8px; padding: 6px 8px; }
+.mk-tag { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-inline-start: 4px; white-space: nowrap; }
+.mk-tag-short { background: rgba(214,69,69,.14); color: #9A2b2b; }
+.mk-tag-over { background: rgba(217,142,4,.16); color: #7A5B00; }
+.mk-tag-ok { background: rgba(47,158,88,.15); color: #1f6b3b; }
+.mk-tag-info { background: rgba(154,160,166,.2); color: var(--text-secondary); }
+.mk-trow { background: var(--bg-card); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.mk-trow-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.mk-tname { font-weight: 700; font-size: 13.5px; }
+.mk-bar { position: relative; height: 9px; border-radius: 999px; background: #EEECE7; }
+.mk-bar-fill { height: 100%; border-radius: 999px; background: var(--accent-fin); }
+.mk-bar-target { position: absolute; top: -3px; width: 2px; height: 15px; background: var(--text-primary); border-radius: 2px; }
+.mk-range { position: relative; height: 5px; border-radius: 999px; background: #EEECE7; margin: 6px 0 4px; }
+.mk-range-dot { position: absolute; top: -3px; width: 11px; height: 11px; border-radius: 50%; background: var(--accent-fin); transform: translateX(50%); }
+html[dir="ltr"] .mk-range-dot { transform: translateX(-50%); }
+.mk-table-wrap { display: none; }
+@media (min-width: 900px) {
+  .mk-metrics { grid-template-columns: repeat(4, 1fr); }
+  .mk-cards .mk-card { }
+  #marketBody .mk-section:has(.mk-table-wrap) > .mk-cards:not(.mk-cards-small) { display: none; }
+  .mk-table-wrap { display: block; }
+  .mk-cards-small { grid-template-columns: repeat(4, 1fr); }
+}
