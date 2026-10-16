@@ -80,7 +80,7 @@ export function applyFetchFailure(status, bodyText) {
   if (st.data && (kind === "network" || kind === "auth")) {
     st = { ...st, loading: false, refreshFailed: true }; // הנתונים האחרונים שבזיכרון נשארים מוצגים
   } else {
-    st = { ...st, loading: false, kind: kind === "auth" ? "needToken" : kind };
+    st = { ...st, loading: false, kind: kind === "auth" ? "needToken" : kind, httpCode: status }; // קוד בלבד, בלי גוף התגובה
   }
   rerender();
 }
@@ -255,7 +255,7 @@ export function renderMarket() {
   } else if (st.kind === "apiDisabled") {
     html = msg("צריך להפעיל את Google Sheets API בפרויקט הענן.", `<button class="icon-edit-btn" id="mkRetry">↻ נסה שוב</button>`);
   } else if (st.kind === "sheetUnreadable") {
-    html = msg("לא הצלחתי לקרוא את הגיליון. בחרו אותו מחדש בהגדרות.", `<button class="btn-primary" id="mkGoSettings">למסך ההגדרות</button>`);
+    html = msg(`לא הצלחתי לקרוא את הגיליון${st.httpCode ? ` (${Number(st.httpCode)})` : ""}. בחרו אותו מחדש בהגדרות.`, `<button class="btn-primary" id="mkGoSettings">למסך ההגדרות</button>`);
   } else if (st.kind === "network" && !st.data) {
     html = msg("לא הצלחתי לרענן.", `<button class="icon-edit-btn" id="mkRetry">↻ נסה שוב</button>`);
   } else if (!st.data) {

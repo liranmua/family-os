@@ -18,6 +18,9 @@ import { getMeta, setMeta } from "./state.js";
 import { GOOGLE_OAUTH_CLIENT_ID } from "./constants.js";
 
 const CLIENT_ID = GOOGLE_OAUTH_CLIENT_ID;
+// מספר פרויקט הענן (קידומת ה-OAuth Client ID). חובה ב-Picker כדי שה-scope drive.file
+// יעניק לאפליקציה גישה לקובץ שנבחר (אחרת Drive/Sheets API מחזירים 403/404).
+const GOOGLE_CLOUD_PROJECT_NUMBER = "670882998874";
 const SCOPE = "https://www.googleapis.com/auth/drive.file";
 const PICKER_API_KEY = "AIzaSyCcN2NZT9R5-btemFhBvbXobWLqxz7lGSc";
 
@@ -198,6 +201,7 @@ async function openFolderPicker() {
   new google.picker.PickerBuilder()
     .addView(view)
     .setOAuthToken(accessToken)
+    .setAppId(GOOGLE_CLOUD_PROJECT_NUMBER)
     .setDeveloperKey(PICKER_API_KEY)
     .setTitle("בחירת תיקייה משפחתית ב-Drive")
     .setCallback(async (data) => {
@@ -224,6 +228,7 @@ async function openFilePicker() {
   new google.picker.PickerBuilder()
     .addView(view)
     .setOAuthToken(accessToken)
+    .setAppId(GOOGLE_CLOUD_PROJECT_NUMBER)
     .setDeveloperKey(PICKER_API_KEY)
     .setTitle(`בחירת קובץ מתוך "${folderName || "התיקייה המחוברת"}"`)
     .setCallback((data) => {
@@ -242,6 +247,7 @@ async function openSheetPicker() {
   new google.picker.PickerBuilder()
     .addView(view)
     .setOAuthToken(accessToken)
+    .setAppId(GOOGLE_CLOUD_PROJECT_NUMBER)
     .setDeveloperKey(PICKER_API_KEY)
     .setTitle("בחירת גיליון מעקב המניות")
     .setCallback(async (data) => {
