@@ -456,3 +456,11 @@ html[dir="ltr"] .mk-range-dot { transform: translateX(-50%); }
   .pn-cards { grid-template-columns: repeat(2, 1fr); }
   .pn-owners { grid-template-columns: repeat(2, 1fr); }
 }
+.pn-edit { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin-bottom: 8px; }
+.pn-edit .pn-filter select { min-width: 120px; }
+.pn-flash, .pn-flash-ok { margin: 0; padding-bottom: 7px; font-size: 12px; }
+.pn-flash-ok { color: var(--positive); }
+.pn-notes-edit { margin-bottom: 8px; }
+.pn-notes-input { width: 100%; min-height: 70px; box-sizing: border-box; font-family: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid #E5E2DB; border-radius: 8px; resize: vertical; }
+.pn-notes-input:focus { outline: 2px solid var(--accent-fin); outline-offset: 1px; }
+.pn-notes-actions { display: flex; gap: 8px; margin-top: 6px; }

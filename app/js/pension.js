@@ -1,4 +1,4 @@
-// Family OS — מסך "🛡️ פנסיה וביטוח" (Family_OS_Pension_Tracker_Brief.md). ללירן בלבד, קריאה בלבד.
+// Family OS — מסך "🛡️ פנסיה וביטוח" (Family_OS_Pension_Tracker_Brief.md). ללירן בלבד.
 //
 // פרטיות — אותם כללים בדיוק כמו "שוק ההון" (market.js):
 //  • הנתונים נשמרים רק במשתנה המודול הזה (זיכרון). לא ל-Firestore, לא ל-IndexedDB/localStorage, לא ל-cache,
@@ -6,7 +6,10 @@
 //  • נקראים ישירות מ-Google (Sheets API) עם טוקן drive.file הקיים — לא עוברים בשום שרת שלנו.
 //  • מה שנשמר מקומית הוא רק מזהה+שם הגיליון (drive.js, setMeta = IndexedDB מקומי).
 //  • אין כאן סכומים, והטווחים הנקראים הם רק הלשוניות "מעקב" ו"מרשם" (pension-parse.js).
-// קריאה בלבד: אין כתיבה לגיליון (ראו הדוח — כתיבה דורשת אישור נפרד של לירן). בכל כרטיס יש קישור "פתח בגיליון".
+// כתיבה (אושרה ע"י לירן ב-2026-10-18): רק שינוי סטטוס והערות, ורק לעמודות "סטטוס"/"הערות"/"עודכן" של שורה אחת לפי "מזהה"
+// (planWrite ב-pension-parse.js). לפני כל כתיבה קוראים את לשונית "מעקב" מחדש; אם מה ששינינו כבר הוחלף בגיליון — הגיליון
+// מנצח (לא כותבים, מרעננים ומודיעים). אותו טוקן drive.file, בלי scope חדש. שום דבר אחר לא נכתב: לא הוספה/מחיקה של שורות.
+// בכל כרטיס יש גם קישור "פתח בגיליון".
 // הסתרת הטאב ממי שאינו לירן היא נוחות בלבד; ההגנה האמיתית היא ש-Google לא ייתן לחשבון אחר לקרוא את הקובץ.
 
 import { esc } from "./constants.js";
@@ -17,6 +20,7 @@ import { classifyApiError, isMissingTabError } from "./market-parse.js";
 import {
   isPensionUser, PENSION_TABS, pensionRangeFor, parseBatch, computeMetrics, applyFilters, distinct,
   groupByPriority, snapshotByOwner, reportTone, PEOPLE_ORDER, DOC_TYPE, ST_DONE, ST_IRRELEVANT, ST_WAITING,
+  STATUSES, NOTES_MAX, planWrite, todayDmy, parseDmy,
 } from "./pension-parse.js";
 
 export const canSeePension = () => isPensionUser(currentUser());
@@ -27,6 +31,11 @@ let filters = { person: "", type: "", domain: "" };
 let showDone = false;
 let openGroups = new Set(["p:דחוף"]); // "דחוף" פתוח כברירת מחדל; השאר סגורים
 let openDetails = new Set();
+// מצב עריכה (זיכרון בלבד): איזו שורה בכתיבה כרגע, איזו בעריכת הערות (וטיוטת הטקסט), והודעת תוצאה פר-שורה.
+let writingId = null;
+let editingNotesId = null;
+let notesDraft = "";
+let flash = {}; // id -> {text, err}
 let rerender = () => {};
 export function setPensionRerender(fn) { rerender = fn; }
 
@@ -35,6 +44,10 @@ function resetView() {
   showDone = false;
   openGroups = new Set(["p:דחוף"]);
   openDetails = new Set();
+  writingId = null;
+  editingNotesId = null;
+  notesDraft = "";
+  flash = {};
 }
 
 export function clearPensionData() {
@@ -105,12 +118,85 @@ export function refreshPension() {
   if (!canSeePension()) return;
   if (!getPensionSheetId()) { st = { ...st, kind: "noSheet", loading: false }; rerender(); return; }
   st = { ...st, loading: true, kind: null };
+  flash = {}; // ריענון יזום — הודעות הכתיבה הקודמות כבר לא רלוונטיות
   rerender();
   const onFail = () => {
     st = st.data ? { ...st, loading: false, refreshFailed: true } : { ...st, loading: false, kind: "needToken" };
     rerender();
   };
   if (!requestToken((t) => fetchSheet(t), onFail)) onFail();
+}
+
+// ---- כתיבה (סטטוס/הערות בלבד) ----
+
+const WRITE_ERR = {
+  structure: "המבנה של הגיליון השתנה — לא כתבתי.",
+  notFound: "השורה לא נמצאה בגיליון (נמחקה או שהמזהה שונה) — לא כתבתי.",
+  duplicate: "המזהה מופיע בגיליון יותר מפעם אחת — לא כתבתי.",
+  invalid: "הערך לא תקין — לא כתבתי.",
+  conflict: "השורה עודכנה בגיליון בינתיים — לא דרסתי, רעננתי את הנתונים. נסו שוב.",
+  network: "לא הצלחתי לשמור (בעיית רשת). נסו שוב.",
+  needToken: "צריך להתחבר ל-Google Drive כדי לשמור.",
+};
+
+function endWrite(id, text, err) {
+  writingId = null;
+  flash = { ...flash, [id]: { text, err: !!err } };
+  rerender();
+}
+const httpErr = (status) => (status === 403 || status === 404 ? `אין הרשאה לכתוב לגיליון (${status}) — בחרו אותו מחדש בהגדרות.` : `לא הצלחתי לשמור (${status}).`);
+
+// changes = {status?, notes?}. קריאה מחדש של "מעקב" -> planWrite (הגיליון מנצח) -> batchUpdate ל-3 תאים לכל היותר.
+export function saveChange(id, changes) {
+  if (writingId || !canSeePension() || !getPensionSheetId() || !st.data || !st.data.tracking) return;
+  const row = st.data.tracking.find((r) => r.id === id);
+  if (!row) return;
+  const baseline = { status: row.status, notes: row.notes };
+  writingId = id;
+  flash = { ...flash, [id]: undefined };
+  rerender();
+  const started = requestToken((t) => doWrite(t, id, changes, row, baseline, false), () => endWrite(id, WRITE_ERR.needToken, true));
+  if (!started) endWrite(id, WRITE_ERR.needToken, true);
+}
+
+async function doWrite(token, id, changes, row, baseline, retried) {
+  try {
+    const sid = encodeURIComponent(getPensionSheetId());
+    const tab = PENSION_TABS[0];
+    const read = await call(
+      `${API}/${sid}/values/${encodeURIComponent(pensionRangeFor(tab))}?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER`,
+      token
+    );
+    if (read.status === 401 && !retried) {
+      invalidateToken();
+      if (!requestToken((t) => doWrite(t, id, changes, row, baseline, true), () => endWrite(id, WRITE_ERR.needToken, true))) endWrite(id, WRITE_ERR.needToken, true);
+      return;
+    }
+    if (!read.ok) return endWrite(id, httpErr(read.status), true);
+    const plan = planWrite(JSON.parse(read.text).values || [], id, changes, baseline, todayDmy());
+    if (!plan.ok) {
+      endWrite(id, WRITE_ERR[plan.reason] || WRITE_ERR.invalid, true);
+      if (plan.reason === "conflict") fetchSheet(token, true); // מרעננים כדי שיוצג מה שבגיליון
+      return;
+    }
+    if (plan.updates.length) {
+      const w = await fetch(`${API}/${sid}/values:batchUpdate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        // RAW: המחרוזת נכתבת כמו שהיא (תאריך dd/mm/yyyy נשאר טקסט, לא מומר למספר תאריך).
+        body: JSON.stringify({ valueInputOption: "RAW", data: plan.updates.map((u) => ({ range: u.range, values: [[u.value]] })) }),
+      });
+      if (!w.ok) return endWrite(id, httpErr(w.status), true);
+    }
+    // מעדכנים את הזיכרון לפי מה שנכתב (בלי קריאה נוספת)
+    if ("status" in changes) row.status = changes.status;
+    if ("notes" in changes) row.notes = String(changes.notes).trim();
+    if (plan.updates.length) row.updated = parseDmy(todayDmy());
+    if ("notes" in changes) { editingNotesId = null; notesDraft = ""; }
+    endWrite(id, plan.updates.length ? "נשמר בגיליון ✓" : "ללא שינוי", false);
+  } catch (_) {
+    endWrite(id, WRITE_ERR.network, true);
+  }
 }
 
 // ---- רינדור ----
@@ -152,6 +238,7 @@ function filtersBar(rows) {
 
 function card(r, sheetUrl) {
   const open = openDetails.has(r.id);
+  const busy = writingId !== null;
   const metaBits = [r.type, r.domain].filter(Boolean).map((t) => `<span class="mk-tag mk-tag-info">${esc(t)}</span>`).join("");
   const details = [
     r.why ? `<div><b>למה חשוב:</b> ${esc(r.why)}</div>` : "",
@@ -164,8 +251,23 @@ function card(r, sheetUrl) {
     ${metaBits ? `<div class="pn-tags">${metaBits}</div>` : ""}
     ${r.finding ? `<div class="pn-finding">${esc(r.finding)}</div>` : ""}
     ${r.next ? `<div class="pn-next"><span class="pn-next-k">הצעד הבא</span>${esc(r.next)}</div>` : ""}
-    ${r.notes ? `<div class="mk-note"><b>הערות:</b> ${esc(r.notes)}</div>` : ""}
+    ${editingNotesId === r.id
+      ? `<div class="pn-notes-edit">
+          <textarea class="pn-notes-input" data-pn-notes-input maxlength="${NOTES_MAX}" ${busy ? "disabled" : ""} placeholder="הערות">${esc(notesDraft)}</textarea>
+          <div class="pn-notes-actions">
+            <button type="button" class="btn-primary" data-pn-notes-save="${esc(r.id)}" ${busy ? "disabled" : ""}>שמירה</button>
+            <button type="button" class="btn-secondary" data-pn-notes-cancel ${busy ? "disabled" : ""}>ביטול</button>
+          </div></div>`
+      : r.notes ? `<div class="mk-note"><b>הערות:</b> ${esc(r.notes)}</div>` : ""}
     ${open && details ? `<div class="pn-details">${details}</div>` : ""}
+    <div class="pn-edit">
+      <label class="pn-filter"><span>סטטוס</span><select data-pn-status="${esc(r.id)}" ${busy ? "disabled" : ""}>
+        ${(STATUSES.includes(r.status) ? STATUSES : [r.status, ...STATUSES]).map((s) => `<option value="${esc(s)}" ${s === r.status ? "selected" : ""}>${esc(s)}</option>`).join("")}
+      </select></label>
+      ${editingNotesId === r.id ? "" : `<button type="button" class="icon-edit-btn" data-pn-notes="${esc(r.id)}" ${busy ? "disabled" : ""}>${r.notes ? "✎ עריכת הערות" : "+ הערות"}</button>`}
+      ${writingId === r.id ? `<span class="mk-sub">שומר…</span>` : ""}
+      ${flash[r.id] ? `<span class="${flash[r.id].err ? "field-error pn-flash" : "mk-sub pn-flash-ok"}">${esc(flash[r.id].text)}</span>` : ""}
+    </div>
     <div class="pn-foot">
       ${details ? `<button type="button" class="icon-edit-btn" data-pn-details="${esc(r.id)}">${open ? "▾ פחות" : "⋯ פרטים"}</button>` : ""}
       <a class="icon-edit-btn" href="${sheetUrl}" target="_blank" rel="noopener noreferrer">פתח בגיליון</a>
@@ -208,12 +310,14 @@ function docsSection(tracking) {
   const got = base.filter((r) => r.status === ST_DONE).length;
   const items = docs
     .map((r) => `<li class="pn-doc ${r.status === ST_DONE ? "done" : ""}">
-      <input type="checkbox" disabled ${r.status === ST_DONE ? "checked" : ""} aria-label="${esc(r.product || r.id)}">
+      <input type="checkbox" data-pn-doc="${esc(r.id)}" ${r.status === ST_DONE ? "checked" : ""} ${writingId !== null || r.status === ST_IRRELEVANT ? "disabled" : ""} aria-label="${esc(r.product || r.id)}">
       <div><div class="pn-doc-name">${esc(r.product || "(ללא מוצר)")} ${personTag(r.person)}${r.status === ST_IRRELEVANT ? statusPill(r.status) : ""}</div>
-        ${r.next ? `<div class="mk-sub">${esc(r.next)}</div>` : ""}</div>
+        ${r.next ? `<div class="mk-sub">${esc(r.next)}</div>` : ""}
+        ${writingId === r.id ? `<div class="mk-sub">שומר…</div>` : ""}
+        ${flash[r.id] ? `<div class="${flash[r.id].err ? "field-error pn-flash" : "mk-sub pn-flash-ok"}">${esc(flash[r.id].text)}</div>` : ""}</div>
     </li>`)
     .join("");
-  return section("📄 מסמכים להורדה", `<ul class="pn-docs">${items}</ul><div class="mk-sub">הסימון מתבצע כרגע בגיליון עצמו — כאן זו תצוגה בלבד.</div>`,
+  return section("📄 מסמכים להורדה", `<ul class="pn-docs">${items}</ul><div class="mk-sub">סימון מעדכן את הסטטוס ל"הושג" בגיליון; ביטול הסימון מחזיר ל"פתוח".</div>`,
     ` <span class="cat-count">${got}/${base.length}</span>`);
 }
 
@@ -263,7 +367,7 @@ export function renderPension() {
       ${st.refreshFailed ? `<div class="field-error" style="margin-bottom:10px">לא הצלחתי לרענן — מוצגים הנתונים האחרונים שנטענו.</div>` : ""}
       ${d.tracking ? metrics(m) + listSection(d.tracking, sheetUrl) + docsSection(d.tracking) : section("📋 מעקב", STRUCT)}
       ${snapshotSection(d.registry)}
-      <p class="footer-note">קריאה בלבד — הנתונים נקראים ישירות מהגיליון ולא נשמרים באפליקציה. עדכון סטטוס והערות — בגיליון.</p>`;
+      <p class="footer-note">הנתונים נקראים ישירות מהגיליון ולא נשמרים באפליקציה. מכאן אפשר לעדכן רק סטטוס והערות; הוספה ומחיקה של שורות — בגיליון.</p>`;
   }
 
   el.innerHTML = html;
@@ -276,6 +380,32 @@ export function renderPension() {
   el.querySelectorAll("[data-pn-details]").forEach((b) => b.addEventListener("click", () => toggleIn(openDetails, b.dataset.pnDetails)));
   el.querySelectorAll("[data-pn-filter]").forEach((s) =>
     s.addEventListener("change", () => { filters = { ...filters, [s.dataset.pnFilter]: s.value }; renderPension(); })
+  );
+  // כתיבה: סטטוס (בחירה), צ'קליסט מסמכים (סימון = הושג, ביטול = פתוח), הערות (עריכה + שמירה).
+  el.querySelectorAll("[data-pn-status]").forEach((s) =>
+    s.addEventListener("change", () => saveChange(s.dataset.pnStatus, { status: s.value }))
+  );
+  el.querySelectorAll("[data-pn-doc]").forEach((c) =>
+    c.addEventListener("change", () => saveChange(c.dataset.pnDoc, { status: c.checked ? ST_DONE : "פתוח" }))
+  );
+  el.querySelectorAll("[data-pn-notes]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const r = st.data.tracking.find((x) => x.id === b.dataset.pnNotes);
+      editingNotesId = b.dataset.pnNotes;
+      notesDraft = r ? r.notes : "";
+      flash = { ...flash, [editingNotesId]: undefined };
+      renderPension();
+      const ta = el.querySelector("[data-pn-notes-input]");
+      if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    })
+  );
+  const ta = el.querySelector("[data-pn-notes-input]");
+  if (ta) ta.addEventListener("input", () => { notesDraft = ta.value; }); // הטיוטה שורדת רינדור מחדש
+  el.querySelectorAll("[data-pn-notes-cancel]").forEach((b) =>
+    b.addEventListener("click", () => { editingNotesId = null; notesDraft = ""; renderPension(); })
+  );
+  el.querySelectorAll("[data-pn-notes-save]").forEach((b) =>
+    b.addEventListener("click", () => saveChange(b.dataset.pnNotesSave, { notes: notesDraft }))
   );
   const sd = document.getElementById("pnShowDone");
   if (sd) sd.addEventListener("change", () => { showDone = sd.checked; renderPension(); });

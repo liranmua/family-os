@@ -169,3 +169,61 @@ export function reportTone(s) {
   if (/נמצא/.test(t)) return "ok";
   return "none";
 }
+
+// ---- כתיבה מוגבלת (אושרה ע"י לירן ב-2026-10-18) ----
+// רק לעמודות "סטטוס", "הערות" ו"עודכן" של שורה אחת, שמזוהה לפי "מזהה" בקריאה טרייה של הגיליון (לא לפי מספר שורה מהטעינה
+// הקודמת). "הגיליון מנצח": אם הסטטוס/ההערות שאנחנו עומדים לשנות כבר שונו בגיליון מאז שהמסך נטען — לא כותבים.
+// פונקציה טהורה: מחזירה תוכנית כתיבה (טווחים וערכים) ולא נוגעת ברשת. שום עמודה אחרת לא מופיעה בתוכנית.
+
+export const STATUSES = ["פתוח", "בטיפול", ST_WAITING, ST_DONE, ST_IRRELEVANT];
+export const NOTES_MAX = 2000;
+export const WRITE_COLS = ["סטטוס", "הערות", "עודכן"];
+
+export function colLetter(i) {
+  let n = i + 1, s = "";
+  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+
+// dd/mm/yyyy (שעון מקומי של המכשיר) — נכתב כטקסט.
+export function todayDmy(d = new Date()) {
+  const p = (x) => String(x).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+
+// values = שורות הלשונית "מעקב" כפי שהוחזרו עכשיו מהגיליון (כולל שורת כותרת).
+// changes = {status?, notes?}; baseline = {status, notes} כפי שהוצגו למשתמש; today = dd/mm/yyyy.
+export function planWrite(values, id, changes, baseline, today) {
+  if (!values || !values.length) return { ok: false, reason: "structure" };
+  const header = values[0].map(str);
+  const col = {};
+  header.forEach((h, i) => { if (h && !(h in col)) col[h] = i; });
+  if (["מזהה", ...WRITE_COLS].some((c) => !(c in col))) return { ok: false, reason: "structure" };
+
+  const hits = [];
+  for (let r = 1; r < values.length; r++) if (str(values[r][col["מזהה"]]) === id) hits.push(r);
+  if (!hits.length) return { ok: false, reason: "notFound" };
+  if (hits.length > 1) return { ok: false, reason: "duplicate" };
+  const rowIdx = hits[0];
+  const cur = values[rowIdx];
+
+  const wantStatus = "status" in changes ? changes.status : undefined;
+  const wantNotes = "notes" in changes ? str(changes.notes) : undefined;
+  if (wantStatus !== undefined && !STATUSES.includes(wantStatus)) return { ok: false, reason: "invalid" };
+  if (wantNotes !== undefined && wantNotes.length > NOTES_MAX) return { ok: false, reason: "invalid" };
+
+  const sheetStatus = str(cur[col["סטטוס"]]) || "פתוח";
+  const sheetNotes = str(cur[col["הערות"]]);
+  const conflict =
+    (wantStatus !== undefined && sheetStatus !== baseline.status) ||
+    (wantNotes !== undefined && sheetNotes !== baseline.notes);
+  if (conflict) return { ok: false, reason: "conflict" };
+
+  const title = PENSION_TABS[0].title;
+  const cell = (name) => `'${title}'!${colLetter(col[name])}${rowIdx + 1}`;
+  const updates = [];
+  if (wantStatus !== undefined && wantStatus !== sheetStatus) updates.push({ range: cell("סטטוס"), value: wantStatus });
+  if (wantNotes !== undefined && wantNotes !== sheetNotes) updates.push({ range: cell("הערות"), value: wantNotes });
+  if (updates.length) updates.push({ range: cell("עודכן"), value: today });
+  return { ok: true, row: rowIdx + 1, updates };
+}
