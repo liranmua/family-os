@@ -21,6 +21,8 @@ import {
 import { getMarketSheetId as driveGetMarketSheetId, getMarketSheetName as driveGetMarketSheetName, pickSheet as drivePickSheet } from "./drive.js";
 import { getFolderId as driveGetFolderId, getFolderName as driveGetFolderName, getLastError as driveGetLastError, pickFolder as drivePickFolder } from "./drive.js";
 import { canSeeMarket, renderMarket, refreshMarket, clearMarketData, setMarketRerender } from "./market.js";
+import { canSeePension, renderPension, refreshPension, clearPensionData, setPensionRerender } from "./pension.js";
+import { getPensionSheetId as driveGetPensionSheetId, getPensionSheetName as driveGetPensionSheetName, pickPensionSheet as drivePickPensionSheet } from "./drive.js";
 import { isPushSupported, isPushGranted, getPushError as pushGetError, enablePush } from "./push.js";
 
 let activeCategoryFilter = "";
@@ -809,39 +811,49 @@ export function renderCalendarScreen() {
 // ---- Finance (תצוגה מופשטת — לא טבלת נתונים גולמית) ----
 
 // אזור הפיננסים: "מבט מהיר" (תמיד) + "📈 שוק ההון" (לירן בלבד — market.js). לכל משתמש אחר: בדיוק כמו קודם, בלי טאבים.
-let financeSubView = "quick"; // "quick" | "market"
+// "🛡️ פנסיה וביטוח" (pension.js) — אותו מנגנון ואותה הרשאת-צפייה (לירן בלבד), נתונים בזיכרון בלבד.
+let financeSubView = "quick"; // "quick" | "market" | "pension"
 setMarketRerender(renderMarket);
+setPensionRerender(renderPension);
 export function resetFinanceView() {
   financeSubView = "quick";
   clearMarketData();
+  clearPensionData();
   renderFinance();
 }
 
 function renderFinanceTabs() {
   const tabs = document.getElementById("financeTabs");
   const market = document.getElementById("marketBody");
+  const pension = document.getElementById("pensionBody");
   const card = document.getElementById("financeCard");
-  if (!tabs || !market) return;
+  if (!tabs || !market || !pension) return;
   const mk = canSeeMarket();
-  if (!mk) { financeSubView = "quick"; clearMarketData(); }
+  if (!mk) { financeSubView = "quick"; clearMarketData(); clearPensionData(); }
   tabs.hidden = !mk;
   tabs.innerHTML = mk
     ? `<button class="store-tab ${financeSubView === "quick" ? "active" : ""}" data-fin-tab="quick">מבט מהיר</button>
-       <button class="store-tab ${financeSubView === "market" ? "active" : ""}" data-fin-tab="market">📈 שוק ההון</button>`
+       <button class="store-tab ${financeSubView === "market" ? "active" : ""}" data-fin-tab="market">📈 שוק ההון</button>
+       <button class="store-tab ${financeSubView === "pension" ? "active" : ""}" data-fin-tab="pension">🛡️ פנסיה וביטוח</button>`
     : "";
   card.hidden = financeSubView !== "quick";
   market.hidden = financeSubView !== "market";
+  pension.hidden = financeSubView !== "pension";
   tabs.querySelectorAll("[data-fin-tab]").forEach((b) =>
     b.addEventListener("click", () => {
       const to = b.dataset.finTab;
       if (to === financeSubView) return;
       financeSubView = to;
-      if (to === "market") refreshMarket(); // רענון בכל כניסה לטאב (קריאה מתחילה מלחיצה — חלון ההרשאה של Google לא נחסם)
-      else clearMarketData();
+      // נתוני הטאב שעוזבים נמחקים מהזיכרון; בכניסה לטאב רענון מחדש (הקריאה מתחילה מלחיצה — חלון ההרשאה של Google לא נחסם)
+      clearMarketData();
+      clearPensionData();
+      if (to === "market") refreshMarket();
+      else if (to === "pension") refreshPension();
       renderFinance();
     })
   );
   if (mk && financeSubView === "market") renderMarket();
+  if (mk && financeSubView === "pension") renderPension();
 }
 
 export function renderFinance() {
@@ -924,11 +936,17 @@ export function renderDriveSettings() {
     <div class="toolbar-row" style="justify-content:space-between;align-items:center;margin-top:10px">
       <span style="font-size:13px">📈 גיליון מעקב מניות: ${driveGetMarketSheetId() ? esc(driveGetMarketSheetName() || "נבחר") : "עדיין לא נבחר"}</span>
       <button class="icon-edit-btn" id="marketPickSheetBtn">${driveGetMarketSheetId() ? "החלפת גיליון" : "בחירת גיליון"}</button>
+    </div>
+    <div class="toolbar-row" style="justify-content:space-between;align-items:center;margin-top:10px">
+      <span style="font-size:13px">🛡️ גיליון מרשם קופות ופוליסות: ${driveGetPensionSheetId() ? esc(driveGetPensionSheetName() || "נבחר") : "עדיין לא נבחר"}</span>
+      <button class="icon-edit-btn" id="pensionPickSheetBtn">${driveGetPensionSheetId() ? "החלפת גיליון" : "בחירת גיליון"}</button>
     </div>` : ""}`;
 
   document.getElementById("drivePickFolderBtn").addEventListener("click", () => drivePickFolder());
   const mkBtn = document.getElementById("marketPickSheetBtn");
   if (mkBtn) mkBtn.addEventListener("click", () => drivePickSheet());
+  const pnBtn = document.getElementById("pensionPickSheetBtn");
+  if (pnBtn) pnBtn.addEventListener("click", () => drivePickPensionSheet());
 }
 
 // ---- התראות Push (סבב 2, Family_OS_Notifications_Brief.md, מסלול ב') ----

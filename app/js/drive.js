@@ -40,7 +40,11 @@ let folderName = null;
 // דרך setMeta (IndexedDB מקומי, לא מסתנכרן ל-Firestore), בדיוק כמו driveFolderId. נתוני התיק עצמם לא נשמרים בשום מקום.
 let marketSheetId = null;
 let marketSheetName = null;
-let tokenCb = null;   // מי מחכה לטוקן (market.js)
+// גיליון "מרשם קופות ופוליסות" (Family_OS_Pension_Tracker_Brief.md, ללירן בלבד): אותו מנגנון בדיוק — רק מזהה+שם, מקומית.
+// המזהה לא מוטבע בקוד (ה-repo ציבורי) וגם לא היה עוזר: ב-drive.file הגישה ניתנת רק לקובץ שנבחר ב-Picker.
+let pensionSheetId = null;
+let pensionSheetName = null;
+let tokenCb = null;   // מי מחכה לטוקן (market.js / pension.js)
 let tokenFail = null; // ומה לעשות אם לא התקבל
 
 export function isConnected() { return hasGranted; }
@@ -49,6 +53,8 @@ export function getFolderId() { return folderId; }
 export function getFolderName() { return folderName; }
 export function getMarketSheetId() { return marketSheetId; }
 export function getMarketSheetName() { return marketSheetName; }
+export function getPensionSheetId() { return pensionSheetId; }
+export function getPensionSheetName() { return pensionSheetName; }
 export function isDriveReady() { return !!tokenClient; }
 // טוקן תקף אם יש (בלי לבקש חדש) — null אחרת. אותו טוקן drive.file שכבר משמש את ה-Picker.
 export function getValidToken() {
@@ -112,6 +118,8 @@ export async function initDrive(changeHandler) {
   folderName = await getMeta("driveFolderName", null);
   marketSheetId = await getMeta("marketSheetId", null);
   marketSheetName = await getMeta("marketSheetName", null);
+  pensionSheetId = await getMeta("pensionSheetId", null);
+  pensionSheetName = await getMeta("pensionSheetName", null);
 
   try {
     await loadGis();
@@ -153,7 +161,8 @@ function handleTokenResponse(resp) {
   pendingAction = null;
   if (action === "folder") openFolderPicker();
   else if (action === "file") openFilePicker();
-  else if (action === "sheet") openSheetPicker();
+  else if (action === "sheet") openSheetPicker("market");
+  else if (action === "pensionSheet") openSheetPicker("pension");
   else if (action === "token") {
     const cb = tokenCb;
     tokenCb = null;
@@ -187,7 +196,13 @@ export function pickFile(onPicked) {
 // בחירה חד-פעמית של גיליון מעקב המניות (מההגדרות, ללירן בלבד). בלי הגבלה לתיקייה — הגיליון נמצא בתת-תיקייה.
 export function pickSheet() {
   if (!tokenClient) return;
-  ensureToken("sheet", openSheetPicker);
+  ensureToken("sheet", () => openSheetPicker("market"));
+}
+
+// בחירה חד-פעמית של גיליון "מרשם קופות ופוליסות" (מההגדרות, ללירן בלבד).
+export function pickPensionSheet() {
+  if (!tokenClient) return;
+  ensureToken("pensionSheet", () => openSheetPicker("pension"));
 }
 
 let _onFolderPicked = null;
@@ -241,7 +256,7 @@ async function openFilePicker() {
     .setVisible(true);
 }
 
-async function openSheetPicker() {
+async function openSheetPicker(kind) {
   try { await loadPicker(); } catch (e) { lastError = e.message; onChange(); return; }
   const view = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setIncludeFolders(true);
   new google.picker.PickerBuilder()
@@ -249,15 +264,22 @@ async function openSheetPicker() {
     .setOAuthToken(accessToken)
     .setAppId(GOOGLE_CLOUD_PROJECT_NUMBER)
     .setDeveloperKey(PICKER_API_KEY)
-    .setTitle("בחירת גיליון מעקב המניות")
+    .setTitle(kind === "pension" ? "בחירת גיליון מרשם קופות ופוליסות" : "בחירת גיליון מעקב המניות")
     .setCallback(async (data) => {
       if (data.action !== google.picker.Action.PICKED) return;
       const doc = data.docs && data.docs[0];
       if (!doc) return;
-      marketSheetId = doc.id;
-      marketSheetName = doc.name;
-      await setMeta("marketSheetId", marketSheetId);
-      await setMeta("marketSheetName", marketSheetName);
+      if (kind === "pension") {
+        pensionSheetId = doc.id;
+        pensionSheetName = doc.name;
+        await setMeta("pensionSheetId", pensionSheetId);
+        await setMeta("pensionSheetName", pensionSheetName);
+      } else {
+        marketSheetId = doc.id;
+        marketSheetName = doc.name;
+        await setMeta("marketSheetId", marketSheetId);
+        await setMeta("marketSheetName", marketSheetName);
+      }
       onChange();
     })
     .build()

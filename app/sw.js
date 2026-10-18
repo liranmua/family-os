@@ -32,7 +32,7 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-const CACHE = "family-os-v25";
+const CACHE = "family-os-v26";
 const SHELL = [
   "./",
   "./index.html",
@@ -56,6 +56,8 @@ const SHELL = [
   "./js/push.js",
   "./js/market.js",
   "./js/market-parse.js",
+  "./js/pension.js",
+  "./js/pension-parse.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
