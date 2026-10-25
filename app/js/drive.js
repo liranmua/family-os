@@ -22,7 +22,7 @@ const CLIENT_ID = GOOGLE_OAUTH_CLIENT_ID;
 // יעניק לאפליקציה גישה לקובץ שנבחר (אחרת Drive/Sheets API מחזירים 403/404).
 const GOOGLE_CLOUD_PROJECT_NUMBER = "670882998874";
 const SCOPE = "https://www.googleapis.com/auth/drive.file";
-const PICKER_API_KEY = "AIzaSyCcN2NZT9R5-btemFhBvbXobWLqxz7lGSc";
+const PICKER_API_KEY = "AIzaSyAgBJKnrbPMDSFBoV3xouFjwxn5csiIzJI";
 
 let tokenClient = null;
 let accessToken = null;
